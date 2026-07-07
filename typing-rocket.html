@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ローマじロケット - ぎんがタイピングだいぼうけん</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --deep1:#0a0924; --deep2:#181352; --deep3:#261d72;
+    --pink:#ff6fa5; --yellow:#ffd93d; --mint:#5be7b0; --blue:#5aa9ff; --purple:#b98eff;
+    --white:#fdf7ff; --panel:rgba(20,16,60,.74); --panel-border:rgba(255,255,255,.1);
+    --world-accent: var(--yellow);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:radial-gradient(ellipse at 50% -10%, var(--deep3), var(--deep1) 65%);
+    font-family:'Zen Maru Gothic',sans-serif;color:var(--white);overflow:hidden;user-select:none;}
+  #stars{position:fixed;inset:0;z-index:0;pointer-events:none;}
+  .star{position:absolute;background:#fff;border-radius:50%;opacity:.8;animation:twinkle 3s ease-in-out infinite;}
+  @keyframes twinkle{0%,100%{opacity:.15;}50%{opacity:1;}}
+  .title-font{font-family:'Yusei Magic','Zen Maru Gothic',sans-serif;}
+
+  #app{position:relative;z-index:1;width:100%;height:100vh;min-height:580px;}
+
+  /* ---------- generic screens ---------- */
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    padding:22px;text-align:center;overflow-y:auto;}
+  .screen.active{display:flex;}
+  .screen h1.game-title{font-size:clamp(26px,5vw,48px);margin:0 0 4px;letter-spacing:1px;
+    background:linear-gradient(90deg,var(--yellow),var(--pink) 55%,var(--purple));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 4px 18px rgba(255,111,165,.35));}
+  .sub{color:#cfc9ff;font-size:14px;max-width:560px;line-height:1.7;}
+  .screen-header{position:sticky;top:0;width:100%;display:flex;align-items:center;gap:10px;padding:6px 4px 2px;}
+  .screen-header .h-title{flex:1;font-family:'Yusei Magic',sans-serif;font-size:20px;color:var(--yellow);}
+
+  .btn{font-family:'Yusei Magic',sans-serif;font-size:17px;color:var(--deep1);background:var(--yellow);
+    border:none;border-radius:999px;padding:13px 30px;cursor:pointer;
+    box-shadow:0 6px 0 #c99f10,0 10px 20px rgba(0,0,0,.35);transition:transform .08s ease;}
+  .btn:hover{transform:translateY(-2px);}
+  .btn:active{transform:translateY(3px);box-shadow:0 2px 0 #c99f10,0 4px 10px rgba(0,0,0,.35);}
+  .btn.secondary{background:var(--mint);box-shadow:0 6px 0 #2f9c74,0 10px 20px rgba(0,0,0,.35);}
+  .btn.blue{background:var(--blue);box-shadow:0 6px 0 #2f6fbf,0 10px 20px rgba(0,0,0,.35);}
+  .btn.purple{background:var(--purple);box-shadow:0 6px 0 #7a52c9,0 10px 20px rgba(0,0,0,.35);}
+  .btn.ghost{background:transparent;color:var(--white);border:2px solid rgba(255,255,255,.25);
+    box-shadow:none;padding:10px 22px;font-size:14px;}
+  .btn.small{padding:9px 18px;font-size:13px;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;}
+
+  .icon-btn{position:fixed;top:12px;background:rgba(20,16,60,.6);border:2px solid rgba(255,255,255,.15);
+    color:var(--white);border-radius:50%;width:42px;height:42px;font-size:18px;cursor:pointer;z-index:20;}
+  #sound-toggle{right:12px;}
+  .icon-btn:hover{border-color:var(--yellow);}
+
+  /* ---------- title screen ---------- */
+  #screen-title{position:relative;}
+  .float-deco{position:absolute;font-size:34px;opacity:.5;animation:floaty 6s ease-in-out infinite;pointer-events:none;}
+  @keyframes floaty{0%,100%{transform:translateY(0) rotate(0);}50%{transform:translateY(-18px) rotate(8deg);}}
+  .profile-bar{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;background:var(--panel);
+    border:2px solid var(--panel-border);border-radius:18px;padding:10px 22px;margin:6px 0 4px;font-size:13px;}
+  .profile-bar b{color:var(--yellow);font-family:'Yusei Magic',sans-serif;}
+  .title-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px;}
+  .char-preview{font-size:44px;filter:drop-shadow(0 0 14px rgba(255,217,61,.4));}
+
+  /* ---------- card grids (world / difficulty) ---------- */
+  .card-grid{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:10px;max-width:900px;}
+  .pick-card{width:168px;padding:18px 14px;border-radius:20px;cursor:pointer;position:relative;
+    background:var(--panel);border:2px solid var(--panel-border);transition:transform .12s ease,border-color .12s ease;}
+  .pick-card:hover{transform:translateY(-6px) scale(1.03);border-color:var(--world-card-accent,var(--yellow));}
+  .pick-card.selected{border-color:var(--world-card-accent,var(--yellow));box-shadow:0 0 0 3px rgba(255,255,255,.06);}
+  .pick-card .emoji{font-size:36px;}
+  .pick-card .name{font-family:'Yusei Magic',sans-serif;font-size:16px;margin:6px 0 2px;}
+  .pick-card .desc{font-size:11.5px;color:#c8c2f0;line-height:1.5;}
+  .pick-card .cleared-badge{position:absolute;top:8px;right:10px;font-size:16px;}
+
+  /* ---------- game screen ---------- */
+  .screen.screen-game.active{align-items:stretch;justify-content:flex-start;padding:0;}
+  #hud{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;gap:10px;flex-wrap:wrap;
+    background:linear-gradient(180deg,rgba(10,9,36,.9),rgba(10,9,36,0));z-index:5;}
+  .hud-block{display:flex;flex-direction:column;align-items:center;font-family:'Yusei Magic',sans-serif;min-width:56px;}
+  .hud-label{font-size:10px;color:#b7b0e6;}
+  .hud-value{font-size:19px;color:var(--yellow);}
+  #combo-value{font-size:19px;color:var(--pink);}
+  #lives{display:flex;gap:4px;font-size:20px;}
+  .life{filter:drop-shadow(0 0 4px rgba(255,255,255,.5));transition:transform .2s;}
+  .life.lost{opacity:.15;filter:none;transform:scale(.8);}
+  #quit-btn{font-size:12px;padding:7px 14px;}
+  .progress-wrap{flex:1 1 140px;min-width:120px;}
+  .progress-label{font-size:10px;color:#b7b0e6;margin-bottom:2px;text-align:center;}
+  .progress-bar{height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden;}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--mint),var(--blue));
+    border-radius:6px;transition:width .25s ease;}
+
+  #game-area{position:relative;flex:1;overflow:hidden;transition:background .4s;}
+  #game-area.shake{animation:areaShake .3s;}
+  @keyframes areaShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+  .game-area.world-1{background:radial-gradient(circle at 20% 15%,rgba(91,231,176,.16),transparent 45%),radial-gradient(circle at 80% 10%,rgba(91,231,176,.07),transparent 40%);--world-accent:#5be7b0;}
+  .game-area.world-2{background:radial-gradient(circle at 20% 15%,rgba(255,154,90,.16),transparent 45%),radial-gradient(circle at 80% 10%,rgba(255,111,165,.09),transparent 40%);--world-accent:#ff9a5a;}
+  .game-area.world-3{background:radial-gradient(circle at 20% 15%,rgba(90,169,255,.18),transparent 45%),radial-gradient(circle at 80% 10%,rgba(90,169,255,.08),transparent 40%);--world-accent:#5aa9ff;}
+  .game-area.world-4{background:radial-gradient(circle at 20% 15%,rgba(185,142,255,.18),transparent 45%),radial-gradient(circle at 80% 10%,rgba(185,142,255,.08),transparent 40%);--world-accent:#b98eff;}
+  .game-area.world-5{background:radial-gradient(circle at 20% 15%,rgba(255,217,61,.16),transparent 45%),radial-gradient(circle at 80% 10%,rgba(255,217,61,.08),transparent 40%);--world-accent:#ffd93d;}
+
+  .word{position:absolute;top:-60px;transform:translateX(-50%);text-align:center;padding:8px 14px;border-radius:16px;
+    background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);transition:border-color .15s,box-shadow .15s;white-space:nowrap;}
+  .word .kana{font-size:19px;font-family:'Yusei Magic',sans-serif;margin-bottom:2px;}
+  .word .romaji{font-size:15px;letter-spacing:1px;font-weight:700;}
+  .word .romaji .done{color:var(--mint);text-shadow:0 0 8px rgba(91,231,176,.7);}
+  .word .romaji .todo{color:#e9e6ff;}
+  .word.targeted{border-color:var(--world-accent);box-shadow:0 0 18px var(--world-accent);background:rgba(255,255,255,.09);}
+  .word.miss-flash{animation:missShake .25s;}
+  @keyframes missShake{0%,100%{transform:translateX(-50%);}25%{transform:translateX(-56%);}75%{transform:translateX(-44%);}}
+
+  #ground{position:absolute;left:0;right:0;bottom:0;height:74px;
+    background:linear-gradient(180deg,var(--deep3),var(--deep2) 70%);border-top:3px solid rgba(255,255,255,.15);}
+  #ground::before{content:"";position:absolute;top:-16px;left:0;right:0;height:16px;
+    background:radial-gradient(ellipse at center,rgba(90,169,255,.25),transparent 70%);}
+  #mascot{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:44px;transition:transform .18s;}
+  #mascot.happy{animation:hop .35s ease;}
+  #mascot.sad{animation:sadShake .4s ease;}
+  @keyframes hop{0%{transform:translateX(-50%) translateY(0);}40%{transform:translateX(-50%) translateY(-22px) rotate(-6deg);}100%{transform:translateX(-50%) translateY(0);}}
+  @keyframes sadShake{0%,100%{transform:translateX(-50%);}30%{transform:translateX(-62%) rotate(-8deg);}60%{transform:translateX(-38%) rotate(8deg);}}
+
+  .particle{position:absolute;width:8px;height:8px;border-radius:50%;pointer-events:none;animation:pop .55s ease-out forwards;}
+  @keyframes pop{0%{transform:translate(0,0) scale(1);opacity:1;}100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0;}}
+
+  #toast-container{position:absolute;top:64px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;
+    align-items:center;gap:6px;pointer-events:none;z-index:8;width:100%;}
+  .toast{font-family:'Yusei Magic',sans-serif;font-size:17px;color:var(--yellow);background:rgba(12,11,46,.72);
+    padding:6px 18px;border-radius:999px;animation:toastUp 1s ease-out forwards;text-shadow:0 0 10px rgba(255,217,61,.6);}
+  .toast.big{font-size:25px;color:var(--pink);text-shadow:0 0 14px rgba(255,111,165,.8);}
+  @keyframes toastUp{0%{opacity:0;transform:translateY(10px) scale(.8);}15%{opacity:1;transform:translateY(0) scale(1.05);}
+    30%{transform:translateY(0) scale(1);}100%{opacity:0;transform:translateY(-24px) scale(1);}}
+
+  #levelup-banner{position:absolute;top:36%;left:50%;transform:translate(-50%,-50%) scale(.6);
+    font-family:'Yusei Magic',sans-serif;font-size:38px;color:var(--yellow);
+    text-shadow:0 0 24px rgba(255,217,61,.8);opacity:0;z-index:9;pointer-events:none;}
+  #levelup-banner.show{animation:levelPop 1.3s ease forwards;}
+  @keyframes levelPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-6deg);}
+    20%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(3deg);}35%{transform:translate(-50%,-50%) scale(1) rotate(0);}
+    80%{opacity:1;}100%{opacity:0;transform:translate(-50%,-50%) scale(1) translateY(-20px);}}
+
+  /* ---------- result screen ---------- */
+  .result-card{background:var(--panel);border-radius:26px;padding:28px 34px;border:2px solid var(--panel-border);max-width:440px;width:100%;}
+  .stars-row{display:flex;gap:10px;justify-content:center;font-size:40px;margin:6px 0 10px;}
+  .stars-row span{opacity:.2;transform:scale(.6);display:inline-block;}
+  .stars-row span.lit{animation:starPop .5s ease forwards;}
+  @keyframes starPop{0%{opacity:.2;transform:scale(.6) rotate(-15deg);}60%{opacity:1;transform:scale(1.3) rotate(8deg);}100%{opacity:1;transform:scale(1) rotate(0);}}
+  .result-row{display:flex;justify-content:space-between;font-size:15px;margin:7px 0;color:#e5e0ff;}
+  .result-row b{color:var(--yellow);font-family:'Yusei Magic',sans-serif;font-size:18px;}
+  .unlock-toast{background:rgba(255,217,61,.12);border:1px solid rgba(255,217,61,.4);border-radius:12px;
+    padding:8px 12px;margin:6px 0;font-size:13px;text-align:left;}
+  .name-row{display:flex;gap:8px;margin-top:12px;justify-content:center;flex-wrap:wrap;}
+  .name-row input{font-family:'Zen Maru Gothic',sans-serif;border-radius:10px;border:2px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.08);color:var(--white);padding:9px 12px;font-size:14px;width:140px;}
+  .disclose{font-size:10.5px;color:#a49bd6;margin-top:6px;}
+  .result-actions{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap;}
+
+  /* ---------- leaderboard ---------- */
+  .lb-list{width:100%;max-width:480px;display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+  .lb-row{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--panel-border);
+    border-radius:14px;padding:9px 14px;font-size:14px;}
+  .lb-rank{width:28px;font-family:'Yusei Magic',sans-serif;color:var(--yellow);}
+  .lb-name{flex:1;text-align:left;}
+  .lb-score{font-family:'Yusei Magic',sans-serif;color:var(--mint);}
+
+  /* ---------- album ---------- */
+  .tabs{display:flex;gap:8px;margin:8px 0;}
+  .tab-btn{background:rgba(255,255,255,.08);border:2px solid transparent;color:var(--white);border-radius:999px;
+    padding:8px 18px;font-size:13px;cursor:pointer;font-family:'Yusei Magic',sans-serif;}
+  .tab-btn.active{border-color:var(--yellow);color:var(--yellow);}
+  .album-grid{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:820px;margin-top:6px;}
+  .album-item{width:130px;background:var(--panel);border:2px solid var(--panel-border);border-radius:16px;padding:14px 10px;}
+  .album-item.locked{opacity:.45;}
+  .album-item .emoji{font-size:32px;}
+  .album-item .name{font-size:12.5px;font-family:'Yusei Magic',sans-serif;margin:6px 0 2px;}
+  .album-item .desc{font-size:10.5px;color:#c8c2f0;line-height:1.4;}
+  .album-item.selectable{cursor:pointer;}
+  .album-item.active-char{border-color:var(--yellow);box-shadow:0 0 14px rgba(255,217,61,.4);}
+
+  #hint-bar{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:11px;color:#a49bd6;z-index:5;}
+
+  @media (max-width:480px){
+    .word .kana{font-size:15px;} .word .romaji{font-size:12px;}
+    .screen h1.game-title{font-size:26px;}
+    .result-card{padding:22px 18px;}
+  }
+</style>
+</head>
+<body>
+<div id="stars"></div>
+<button id="sound-toggle" class="icon-btn" title="サウンド切りかえ">🔊</button>
+
+<div id="app">
+
+  <!-- TITLE -->
+  <section id="screen-title" class="screen active">
+    <span class="float-deco" style="top:8%;left:10%;">🪐</span>
+    <span class="float-deco" style="top:14%;right:12%;animation-delay:1.2s;">⭐</span>
+    <span class="float-deco" style="bottom:16%;left:8%;animation-delay:2.4s;">☄️</span>
+    <span class="float-deco" style="bottom:10%;right:9%;animation-delay:.6s;">🌙</span>
+    <h1 class="game-title title-font">🚀 ローマじロケット</h1>
+    <p class="sub">ぎんがを たびして、おちてくる ことばを タイピングで まもろう！<br>ワールドを すすんで、キャラクターと バッジを あつめよう。</p>
+    <div id="char-preview" class="char-preview">🧑‍🚀</div>
+    <div class="profile-bar" id="profile-bar">よみこみちゅう…</div>
+    <div class="title-actions">
+      <button class="btn" id="start-btn">🚀 ぼうけんに でる</button>
+      <button class="btn purple" id="album-btn">📖 ずかん</button>
+      <button class="btn blue" id="lb-btn">🏆 せかいランキング</button>
+    </div>
+  </section>
+
+  <!-- WORLD SELECT -->
+  <section id="screen-world" class="screen">
+    <div class="screen-header"><button class="btn ghost small" data-back="screen-title">← もどる</button><span class="h-title">ワールドをえらぼう</span><span style="width:70px;"></span></div>
+    <p class="sub">ワールドごとに ちがう ことばが でてくるよ。</p>
+    <div class="card-grid" id="world-grid"></div>
+  </section>
+
+  <!-- DIFFICULTY SELECT -->
+  <section id="screen-diff" class="screen">
+    <div class="screen-header"><button class="btn ghost small" data-back="screen-world">← もどる</button><span class="h-title">むずかしさをえらぼう</span><span style="width:70px;"></span></div>
+    <div class="card-grid" id="diff-grid">
+      <div class="pick-card" data-diff="easy" style="--world-card-accent:#5be7b0;">
+        <div class="emoji">🐣</div><div class="name">かんたん</div>
+        <div class="desc">みじかいことば<br>ゆっくりおちる</div>
+      </div>
+      <div class="pick-card" data-diff="normal" style="--world-card-accent:#5aa9ff;">
+        <div class="emoji">🚀</div><div class="name">ふつう</div>
+        <div class="desc">すこしながいことば<br>ふつうのはやさ</div>
+      </div>
+      <div class="pick-card" data-diff="hard" style="--world-card-accent:#ff6fa5;">
+        <div class="emoji">🌟</div><div class="name">むずかしい</div>
+        <div class="desc">ながいことば・ぶんしょう<br>はやくおちる</div>
+      </div>
+    </div>
+    <p class="sub" id="goal-preview" style="font-size:12px;"></p>
+    <button class="btn" id="go-game-btn" style="margin-top:6px;">この ちょうしで スタート！</button>
+  </section>
+
+  <!-- GAME -->
+  <section id="screen-game" class="screen screen-game">
+    <div id="hud">
+      <div class="hud-block"><div class="hud-label">スコア</div><div class="hud-value" id="score-value">0</div></div>
+      <div class="hud-block"><div class="hud-label">れんぞく</div><div id="combo-value">0</div></div>
+      <div class="progress-wrap">
+        <div class="progress-label" id="progress-label">0 / 0 もん</div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      </div>
+      <div class="hud-block"><div class="hud-label">ライフ</div><div id="lives"></div></div>
+      <button class="btn ghost" id="quit-btn">やめる</button>
+    </div>
+    <div id="game-area">
+      <div id="levelup-banner"></div>
+      <div id="toast-container"></div>
+      <div id="ground"></div>
+      <div id="mascot">🧑‍🚀</div>
+    </div>
+    <div id="hint-bar">キーボードの アルファベットキーで うとう（例：ねこ → n → e → k → o）</div>
+  </section>
+
+  <!-- RESULT -->
+  <section id="screen-result" class="screen">
+    <div class="result-card">
+      <h1 class="game-title title-font" id="result-title" style="font-size:28px;">クリア！</h1>
+      <div class="stars-row" id="stars-row"><span>⭐</span><span>⭐</span><span>⭐</span></div>
+      <div class="result-row"><span>スコア</span><b id="final-score">0</b></div>
+      <div class="result-row"><span>さいこうれんぞく</span><b id="final-combo">0</b></div>
+      <div class="result-row"><span>じしんのさいこうスコア</span><b id="final-best">0</b></div>
+      <div id="unlock-list"></div>
+      <div id="rank-section">
+        <div class="name-row">
+          <input type="text" id="name-input" maxlength="8" placeholder="ニックネーム">
+          <button class="btn small" id="submit-score-btn">ランキングに とうろく</button>
+        </div>
+        <p class="disclose">※ とうろくすると、ニックネームとスコアが このゲームで あそぶ みんなに こうかいされます。</p>
+      </div>
+      <div class="result-actions">
+        <button class="btn secondary" id="retry-btn">もういちど</button>
+        <button class="btn blue" id="change-world-btn">べつのワールド</button>
+        <button class="btn ghost" id="result-title-btn">タイトルへ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEADERBOARD -->
+  <section id="screen-leaderboard" class="screen">
+    <div class="screen-header"><button class="btn ghost small" data-back="screen-title">← もどる</button><span class="h-title">🏆 せかいランキング</span>
+      <button class="btn ghost small" id="lb-refresh">さいこうしん</button></div>
+    <div class="lb-list" id="lb-list">よみこみちゅう…</div>
+  </section>
+
+  <!-- ALBUM -->
+  <section id="screen-album" class="screen">
+    <div class="screen-header"><button class="btn ghost small" data-back="screen-title">← もどる</button><span class="h-title">📖 ずかん</span><span style="width:70px;"></span></div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="chars">キャラクター</button>
+      <button class="tab-btn" data-tab="badges">バッジ</button>
+    </div>
+    <div class="album-grid" id="album-grid"></div>
+    <div style="margin-top:18px;">
+      <button class="btn ghost small" id="reset-btn">データをリセット</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* =================== DATA =================== */
+const WORLDS = [
+  { id:'w1', name:'どうぶつの島', icon:'🐾', desc:'どうぶつの なまえで れんしゅう', accent:'#5be7b0',
+    words:[["ねこ","neko"],["いぬ","inu"],["くま","kuma"],["とり","tori"],["うし","ushi"],["ぶた","buta"],
+      ["さる","saru"],["ぱんだ","panda"],["きつね","kitsune"],["うさぎ","usagi"],["らいおん","raion"],
+      ["しまうま","shimauma"],["ぺんぎん","pengin"],["かんがるー","kangaruu"],["こあら","koara"],
+      ["ふくろう","fukurou"],["かめれおん","kamereon"],["とかげ","tokage"],["くじゃく","kujaku"]] },
+  { id:'w2', name:'おやつ惑星', icon:'🍩', desc:'たべものの なまえで れんしゅう', accent:'#ff9a5a',
+    words:[["あめ","ame"],["がむ","gamu"],["けーき","keeki"],["ぷりん","purin"],["どーなつ","doonatsu"],
+      ["くっきー","kukkii"],["ちょこれーと","chokoreeto"],["あいすくりーむ","aisukuriimu"],
+      ["たこやき","takoyaki"],["おにぎり","onigiri"],["すいか","suika"],["ぶどう","budou"],
+      ["めろん","meron"],["ばなな","banana"],["いちご","ichigo"],["ぱふぇ","pafe"],["まかろん","makaron"],["ぜりー","zerii"]] },
+  { id:'w3', name:'のりもの銀河', icon:'🚗', desc:'のりものの なまえで れんしゅう', accent:'#5aa9ff',
+    words:[["くるま","kuruma"],["でんしゃ","densha"],["ひこうき","hikouki"],["ふね","fune"],["ばす","basu"],
+      ["とらっく","torakku"],["じてんしゃ","jitensha"],["ろけっと","roketto"],["へりこぷたー","herikoputaa"],
+      ["しんかんせん","shinkansen"],["ちかてつ","chikatetsu"],["きゅうきゅうしゃ","kyuukyuusha"],
+      ["しょうぼうしゃ","shoubousha"],["たくしー","takushii"],["とらくたー","torakutaa"],["よっと","yotto"]] },
+  { id:'w4', name:'きせつのもり', icon:'🍁', desc:'きせつ・ぎょうじの ことばで れんしゅう', accent:'#b98eff',
+    words:[["はな","hana"],["さくら","sakura"],["つき","tsuki"],["ほし","hoshi"],["ゆき","yuki"],["あめ","ame"],
+      ["にじ","niji"],["たいよう","taiyou"],["かぜ","kaze"],["もみじ","momiji"],["ひまわり","himawari"],
+      ["たなばた","tanabata"],["おしょうがつ","oshougatsu"],["はなび","hanabi"],["うんどうかい","undoukai"],
+      ["なつやすみ","natsuyasumi"],["ゆきだるま","yukidaruma"],["くりすます","kurisumasu"]] },
+  { id:'w5', name:'ことばの神殿', icon:'📜', desc:'みじかい ぶんしょうに ちょうせん', accent:'#ffd93d', goalMul:0.7, speedMul:0.78,
+    words:[["げんきにあそぼう","genkiniasobou"],["ほしぞらをみあげる","hoshizoraomiageru"],
+      ["たのしいなつやすみ","tanoshiinatsuyasumi"],["おおきなにじがでた","ookinanijigadeta"],
+      ["みんなでうたおう","minnadeutaou"],["ゆめにむかってすすもう","yumenimukattesusumou"],
+      ["きょうもいちにちがんばろう","kyoumoichinichiganbarou"],["ともだちとあそぶのがすき","tomodachitoasobunogasuki"],
+      ["そらにひこうきがとんでいる","soranihikoukigatondeiru"],["うみでおよぐのがだいすき","umideoyogunogadaisuki"],
+      ["あしたはきっといいひになる","ashitahakittoiihininaru"],["はやくじょうずになりたいな","hayakujouzuninaritaina"]] }
+];
+
+const DIFF_SETTINGS = {
+  easy:   { fallSpeed:32, spawnInterval:2.6, maxConcurrent:2, speedStep:2.5, spawnFloor:1.4, goal:15 },
+  normal: { fallSpeed:46, spawnInterval:2.1, maxConcurrent:3, speedStep:3.5, spawnFloor:1.1, goal:20 },
+  hard:   { fallSpeed:58, spawnInterval:1.8, maxConcurrent:3, speedStep:4.5, spawnFloor:0.9, goal:24 }
+};
+
+const CHEERS = ["やったね！","すごい！","かんぺき！","さすが！","いいね！","ナイスタイピング！","そのちょうし！"];
+const COMBO_CHEERS = {5:"5れんぞく！のってきた！",10:"10れんぞく！すごすぎる！",20:"20れんぞく！てんさい！",30:"30れんぞく！ロケットだ！"};
+
+const CHARACTERS = [
+  { emoji:'🧑‍🚀', name:'うちゅうひこうし', cost:0 },
+  { emoji:'👽', name:'えいりあん', cost:5 },
+  { emoji:'🤖', name:'ロボット', cost:10 },
+  { emoji:'🐱‍🚀', name:'スペースねこ', cost:18 },
+  { emoji:'🦄', name:'ゆにこーん', cost:28 },
+  { emoji:'🦸', name:'ヒーロー', cost:40 }
+];
+
+const BADGES = [
+  { id:'hajime', icon:'🥇', name:'はじめの一歩', desc:'はじめてステージにちょうせんした' },
+  { id:'perfect', icon:'💎', name:'パーフェクト', desc:'ライフをへらさずクリアした' },
+  { id:'combo10', icon:'🔥', name:'10れんぞく', desc:'10れんぞくで せいかいした' },
+  { id:'combo20', icon:'⚡', name:'20れんぞく', desc:'20れんぞくで せいかいした' },
+  { id:'score1500', icon:'🏆', name:'ハイスコア', desc:'1かいで1500てん いじょう とった' },
+  { id:'allworlds', icon:'🗺️', name:'たびびと', desc:'5つのワールドを すべてクリアした' },
+  { id:'ranked', icon:'🌍', name:'せかいデビュー', desc:'せかいランキングに とうろくした' }
+];
+
+/* =================== STORAGE ===================== */
+// Saving/loading progress is a nice-to-have, never something that should block or
+// alarm the player. If the storage API is missing OR fails even once, we quietly
+// switch to "this session only" mode and stop trying again (no repeated errors).
+let HAS_STORAGE = (typeof window.storage !== 'undefined');
+let storageWarningShown = false;
+function noteStorageUnavailable(){
+  if(HAS_STORAGE){ HAS_STORAGE = false; }
+  if(!storageWarningShown){
+    storageWarningShown = true;
+    const bar = document.getElementById('profile-bar');
+    if(bar){
+      const note = document.createElement('div');
+      note.style.cssText = 'width:100%;font-size:11px;color:#c8a8ff;margin-top:2px;';
+      note.textContent = '※ このかんきょうでは きろくを ほぞんできません（このかいのプレイのみ ゆうこう）';
+      bar.appendChild(note);
+    }
+  }
+}
+function defaultProfile(){
+  return { bestScore:0, bestCombo:0, totalStars:0, plays:0,
+    unlockedChars:['🧑‍🚀'], activeChar:'🧑‍🚀', unlockedBadges:[],
+    worldsCleared:[], soundOn:true };
+}
+let profile = defaultProfile();
+
+async function loadProfile(){
+  if(!HAS_STORAGE){ renderProfileBar(); return; }
+  try{
+    const res = await window.storage.get('profile', false);
+    if(res && res.value){ profile = Object.assign(defaultProfile(), JSON.parse(res.value)); }
+  }catch(e){ /* no saved profile yet (or storage unavailable) - use defaults silently */ }
+  applySound();
+  renderProfileBar();
+  updateCharPreview();
+}
+async function saveProfile(){
+  if(!HAS_STORAGE) return;
+  try{ await window.storage.set('profile', JSON.stringify(profile), false); }
+  catch(e){ console.warn('progress could not be saved; continuing in session-only mode', e); noteStorageUnavailable(); }
+}
+
+async function loadLeaderboard(){
+  const listEl = document.getElementById('lb-list');
+  listEl.textContent = 'よみこみちゅう…';
+  if(!HAS_STORAGE){ listEl.textContent = 'ランキングきのうは このかんきょうでは つかえません。'; return; }
+  try{
+    const res = await window.storage.get('leaderboard', true);
+    let arr = [];
+    if(res && res.value) arr = JSON.parse(res.value);
+    renderLeaderboard(arr);
+  }catch(e){
+    listEl.textContent = 'まだ だれも とうろくしていません。さいしょの ひとりに なろう！';
+  }
+}
+function renderLeaderboard(arr){
+  const listEl = document.getElementById('lb-list');
+  if(!arr.length){ listEl.textContent = 'まだ だれも とうろくしていません。さいしょの ひとりに なろう！'; return; }
+  const medals = ['🥇','🥈','🥉'];
+  listEl.innerHTML = arr.slice(0,20).map((e,i)=>{
+    const rank = i<3 ? medals[i] : (i+1);
+    return `<div class="lb-row"><div class="lb-rank">${rank}</div><div class="lb-name">${escapeHtml(e.name)}</div><div class="lb-score">${e.score}</div></div>`;
+  }).join('');
+}
+async function submitScore(name, score, worldId){
+  if(!HAS_STORAGE) return false;
+  try{
+    let arr = [];
+    try{
+      const res = await window.storage.get('leaderboard', true);
+      if(res && res.value) arr = JSON.parse(res.value);
+    }catch(e){ arr = []; }
+    arr.push({ name, score, world:worldId, ts:Date.now() });
+    arr.sort((a,b)=> b.score - a.score);
+    arr = arr.slice(0,20);
+    await window.storage.set('leaderboard', JSON.stringify(arr), true);
+    return true;
+  }catch(e){ console.warn('leaderboard submit failed', e); noteStorageUnavailable(); return false; }
+}
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* =================== AUDIO (synth, no external files) =================== */
+let audioCtx = null;
+function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+function beep(freq, dur, type, vol, delay){
+  if(!profile.soundOn || !audioCtx) return;
+  const t0 = audioCtx.currentTime + (delay||0);
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type||'sine';
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(vol||0.12, t0);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.02);
+}
+function sfxKey(){ beep(700,0.045,'square',0.045); }
+function sfxComplete(){ beep(880,0.09,'triangle',0.12); beep(1320,0.09,'triangle',0.1,0.06); }
+function sfxMiss(){ beep(150,0.28,'sawtooth',0.11); }
+function sfxPace(){ [523,659,784,1046].forEach((f,i)=>beep(f,0.14,'triangle',0.11,i*0.08)); }
+function sfxClear(){ [523,659,784,1046,1318].forEach((f,i)=>beep(f,0.18,'triangle',0.13,i*0.1)); }
+function sfxDefeat(){ [400,300,200].forEach((f,i)=>beep(f,0.3,'sawtooth',0.1,i*0.18)); }
+function applySound(){
+  document.getElementById('sound-toggle').textContent = profile.soundOn ? '🔊' : '🔇';
+}
+
+/* =================== DOM refs =================== */
+const $ = id => document.getElementById(id);
+const gameArea = $('game-area');
+const mascot = $('mascot');
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+/* =================== Stars background =================== */
+(function makeStars(){
+  const wrap = document.getElementById('stars');
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<90;i++){
+    const s = document.createElement('div');
+    s.className='star';
+    const size = Math.random()*2.4+1;
+    s.style.width=size+'px'; s.style.height=size+'px';
+    s.style.left=Math.random()*100+'%'; s.style.top=Math.random()*100+'%';
+    s.style.animationDelay=(Math.random()*3)+'s';
+    s.style.animationDuration=(2+Math.random()*3)+'s';
+    frag.appendChild(s);
+  }
+  wrap.appendChild(frag);
+})();
+
+/* =================== Profile bar / char preview =================== */
+function renderProfileBar(){
+  $('profile-bar').innerHTML =
+    `<span>さいこうスコア <b>${profile.bestScore}</b></span>` +
+    `<span>ほし <b>${profile.totalStars}</b> ⭐</span>` +
+    `<span>プレイかいすう <b>${profile.plays}</b></span>` +
+    `<span>バッジ <b>${profile.unlockedBadges.length}/${BADGES.length}</b></span>`;
+}
+function updateCharPreview(){ $('char-preview').textContent = profile.activeChar; }
+
+/* =================== World / Difficulty selection =================== */
+let selectedWorld = null;
+let selectedDiff = null;
+
+function buildWorldGrid(){
+  const grid = $('world-grid');
+  grid.innerHTML = '';
+  WORLDS.forEach(w=>{
+    const card = document.createElement('div');
+    card.className = 'pick-card';
+    card.style.setProperty('--world-card-accent', w.accent);
+    const cleared = profile.worldsCleared.includes(w.id);
+    card.innerHTML = `${cleared?'<div class="cleared-badge">✅</div>':''}
+      <div class="emoji">${w.icon}</div><div class="name">${w.name}</div><div class="desc">${w.desc}</div>`;
+    card.addEventListener('click', ()=>{
+      selectedWorld = w;
+      showScreen('screen-diff');
+      updateGoalPreview();
+    });
+    grid.appendChild(card);
+  });
+}
+
+function tierOf(len){ return len<=5 ? 'S' : len<=9 ? 'M' : 'L'; }
+function buildPool(world, diff){
+  const tiers = diff==='easy' ? ['S'] : diff==='normal' ? ['S','M'] : ['M','L'];
+  let pool = world.words.filter(w => tiers.includes(tierOf(w[1].length)));
+  if(pool.length < 5) pool = world.words.slice();
+  return pool;
+}
+
+document.querySelectorAll('#diff-grid .pick-card').forEach(card=>{
+  card.addEventListener('click', ()=>{
+    document.querySelectorAll('#diff-grid .pick-card').forEach(c=>c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedDiff = card.dataset.diff;
+    updateGoalPreview();
+  });
+});
+function updateGoalPreview(){
+  if(!selectedWorld || !selectedDiff){ $('goal-preview').textContent=''; return; }
+  const cfg = DIFF_SETTINGS[selectedDiff];
+  const goal = Math.max(6, Math.round(cfg.goal * (selectedWorld.goalMul||1)));
+  $('goal-preview').textContent = `もくひょう：${goal}もん せいかいで ステージクリア！`;
+}
+$('go-game-btn').addEventListener('click', ()=>{
+  if(!selectedWorld){ showScreen('screen-world'); return; }
+  if(!selectedDiff){ selectedDiff = 'easy'; }
+  startGame(selectedWorld, selectedDiff);
+});
+
+/* =================== Game state =================== */
+let state = null;
+let rafId = null;
+let lastTime = null;
+
+function startGame(world, diff){
+  ensureAudio();
+  const cfg = DIFF_SETTINGS[diff];
+  const goal = Math.max(6, Math.round(cfg.goal * (world.goalMul||1)));
+  const speedMul = world.speedMul || 1;
+  state = {
+    world, diff,
+    pool: buildPool(world, diff),
+    words: [], target: null,
+    score:0, combo:0, bestCombo:0,
+    lives:3, cleared:0, goal,
+    fallSpeed: cfg.fallSpeed*speedMul,
+    spawnInterval: cfg.spawnInterval,
+    spawnTimer: 0.6,
+    cfg
+  };
+  gameArea.className = 'game-area world-' + world.id.replace('w','');
+  gameArea.id = 'game-area';
+  gameArea.querySelectorAll('.word,.particle').forEach(el=>el.remove());
+  $('toast-container').innerHTML = '';
+  mascot.textContent = profile.activeChar;
+  mascot.classList.remove('happy','sad');
+  renderLives(); updateHUD();
+  showScreen('screen-game');
+  lastTime = null;
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function pickWord(){
+  const list = state.pool;
+  const w = list[Math.floor(Math.random()*list.length)];
+  return { kana:w[0], romaji:w[1] };
+}
+function spawnWord(){
+  if(state.words.length >= state.cfg.maxConcurrent) return;
+  const data = pickWord();
+  const el = document.createElement('div');
+  el.className = 'word';
+  el.innerHTML = `<div class="kana">${data.kana}</div><div class="romaji"><span class="todo">${data.romaji}</span></div>`;
+  gameArea.appendChild(el);
+  const areaW = gameArea.clientWidth;
+  const margin = 60;
+  const left = margin + Math.random()*Math.max(10, areaW - margin*2);
+  el.style.left = left+'px';
+  state.words.push({ romaji:data.romaji, typed:'', el, y:-50, x:left });
+}
+function renderWordText(w){
+  const done = w.romaji.slice(0, w.typed.length);
+  const todo = w.romaji.slice(w.typed.length);
+  w.el.querySelector('.romaji').innerHTML = `<span class="done">${done}</span><span class="todo">${todo}</span>`;
+}
+function spawnParticles(x,y,color){
+  for(let i=0;i<14;i++){
+    const p = document.createElement('div');
+    p.className='particle'; p.style.left=x+'px'; p.style.top=y+'px'; p.style.background=color;
+    const angle = Math.random()*Math.PI*2, dist = 30+Math.random()*40;
+    p.style.setProperty('--dx', Math.cos(angle)*dist+'px');
+    p.style.setProperty('--dy', Math.sin(angle)*dist+'px');
+    gameArea.appendChild(p);
+    setTimeout(()=>p.remove(), 600);
+  }
+}
+function showToast(text, big){
+  const t = document.createElement('div');
+  t.className = 'toast'+(big?' big':'');
+  t.textContent = text;
+  $('toast-container').appendChild(t);
+  setTimeout(()=>t.remove(), 1000);
+}
+function bounceMascot(mood){
+  mascot.classList.remove('happy','sad');
+  void mascot.offsetWidth;
+  mascot.classList.add(mood);
+  setTimeout(()=>mascot.classList.remove(mood), 450);
+}
+function updateHUD(){
+  $('score-value').textContent = state.score;
+  $('combo-value').textContent = state.combo;
+  $('progress-label').textContent = `${state.cleared} / ${state.goal} もん`;
+  $('progress-fill').style.width = Math.min(100, (state.cleared/state.goal)*100)+'%';
+}
+function renderLives(){
+  const el = $('lives'); el.innerHTML='';
+  for(let i=0;i<3;i++){
+    const span = document.createElement('span');
+    span.className = 'life'+(i>=state.lives?' lost':'');
+    span.textContent = '🪐';
+    el.appendChild(span);
+  }
+}
+
+function completeWord(w){
+  const rect = w.el.getBoundingClientRect();
+  const areaRect = gameArea.getBoundingClientRect();
+  spawnParticles(rect.left-areaRect.left+rect.width/2, rect.top-areaRect.top+rect.height/2, '#5be7b0');
+  w.el.remove();
+  state.words = state.words.filter(x=>x!==w);
+  if(state.target===w) state.target=null;
+
+  state.combo++;
+  state.bestCombo = Math.max(state.bestCombo, state.combo);
+  const multiplier = 1 + Math.floor(state.combo/5)*0.5;
+  state.score += Math.round((10*w.romaji.length + 30) * multiplier);
+  state.cleared++;
+
+  bounceMascot('happy');
+  sfxComplete();
+  updateHUD();
+
+  if(COMBO_CHEERS[state.combo]) showToast(COMBO_CHEERS[state.combo], true);
+  else showToast(CHEERS[Math.floor(Math.random()*CHEERS.length)], false);
+
+  if(state.cleared % 5 === 0 && state.cleared < state.goal){
+    state.fallSpeed += state.cfg.speedStep;
+    state.spawnInterval = Math.max(state.cfg.spawnFloor, state.spawnInterval - 0.12);
+    banner('ペースアップ！');
+    sfxPace();
+  }
+
+  if(state.cleared >= state.goal){
+    finishStage('clear');
+  }
+}
+function banner(text){
+  const b = $('levelup-banner');
+  b.classList.remove('show'); void b.offsetWidth;
+  b.textContent = text; b.classList.add('show');
+}
+function missWord(w){
+  const rect = w.el.getBoundingClientRect();
+  const areaRect = gameArea.getBoundingClientRect();
+  spawnParticles(rect.left-areaRect.left+rect.width/2, rect.top-areaRect.top+rect.height/2, '#ff6fa5');
+  w.el.remove();
+  state.words = state.words.filter(x=>x!==w);
+  if(state.target===w) state.target=null;
+
+  state.combo = 0;
+  state.lives--;
+  bounceMascot('sad');
+  sfxMiss();
+  gameArea.classList.remove('shake'); void gameArea.offsetWidth; gameArea.classList.add('shake');
+  renderLives(); updateHUD();
+
+  if(state.lives <= 0) finishStage('defeat');
+}
+
+function handleKey(e){
+  if(!state) return;
+  const key = e.key;
+  if(key.length!==1 || !/[a-z]/i.test(key)) return;
+  const k = key.toLowerCase();
+  if(state.target){ tryType(state.target, k); return; }
+  let candidates = state.words.filter(w => w.romaji[w.typed.length]===k);
+  if(!candidates.length) return;
+  candidates.sort((a,b)=> b.y-a.y);
+  const w = candidates[0];
+  state.target = w;
+  w.el.classList.add('targeted');
+  tryType(w, k);
+}
+function tryType(w, k){
+  if(w.romaji[w.typed.length]===k){
+    w.typed += k;
+    renderWordText(w);
+    sfxKey();
+    if(w.typed.length === w.romaji.length) completeWord(w);
+  } else {
+    w.el.classList.remove('miss-flash'); void w.el.offsetWidth; w.el.classList.add('miss-flash');
+    state.combo = 0;
+    updateHUD();
+  }
+}
+
+function loop(t){
+  if(!state) return;
+  if(lastTime===null) lastTime=t;
+  const dt = Math.min(0.05,(t-lastTime)/1000);
+  lastTime = t;
+  const groundY = gameArea.clientHeight - 74;
+
+  state.spawnTimer -= dt;
+  if(state.spawnTimer <= 0){
+    spawnWord();
+    state.spawnTimer = state.spawnInterval + Math.random()*0.4;
+  }
+  for(const w of state.words.slice()){
+    w.y += state.fallSpeed*dt;
+    w.el.style.top = w.y+'px';
+    if(w.y >= groundY) missWord(w);
+  }
+  rafId = requestAnimationFrame(loop);
+}
+
+/* =================== Finish stage / results =================== */
+async function finishStage(result){
+  cancelAnimationFrame(rafId);
+  gameArea.querySelectorAll('.word').forEach(el=>el.remove());
+
+  const stars = result==='clear' ? state.lives : 0;
+  const runScore = state.score;
+  const runCombo = state.bestCombo;
+  const worldId = state.world.id;
+
+  profile.bestScore = Math.max(profile.bestScore, runScore);
+  profile.bestCombo = Math.max(profile.bestCombo, runCombo);
+  profile.totalStars += stars;
+  profile.plays += 1;
+  if(result==='clear' && !profile.worldsCleared.includes(worldId)) profile.worldsCleared.push(worldId);
+
+  const newBadges = checkBadges(result, state.lives, runScore);
+  const newChars = checkCharUnlocks();
+  await saveProfile();
+
+  if(result==='clear') sfxClear(); else sfxDefeat();
+  renderResult(result, stars, runScore, runCombo, newBadges, newChars, worldId);
+  showScreen('screen-result');
+  renderProfileBar();
+  state = null;
+}
+
+function checkBadges(result, livesRemaining, runScore){
+  const newly = [];
+  function unlock(id){ if(!profile.unlockedBadges.includes(id)){ profile.unlockedBadges.push(id); newly.push(id); } }
+  unlock('hajime');
+  if(result==='clear' && livesRemaining===3) unlock('perfect');
+  if(profile.bestCombo>=10) unlock('combo10');
+  if(profile.bestCombo>=20) unlock('combo20');
+  if(runScore>=1500) unlock('score1500');
+  if(result==='clear' && profile.worldsCleared.length>=5) unlock('allworlds');
+  return newly;
+}
+function checkCharUnlocks(){
+  const newly = [];
+  CHARACTERS.forEach(c=>{
+    if(!profile.unlockedChars.includes(c.emoji) && profile.totalStars>=c.cost){
+      profile.unlockedChars.push(c.emoji); newly.push(c);
+    }
+  });
+  return newly;
+}
+
+let lastResultScore = 0;
+let lastResultWorld = null;
+function renderResult(result, stars, score, combo, newBadges, newChars, worldId){
+  lastResultScore = score; lastResultWorld = worldId;
+  $('result-title').textContent = result==='clear' ? '🎉 ステージクリア！' : 'ざんねん…！';
+  const starsRow = $('stars-row');
+  starsRow.querySelectorAll('span').forEach((s,i)=>{
+    s.classList.remove('lit');
+    if(i < stars) setTimeout(()=>s.classList.add('lit'), 150+i*220);
+  });
+  $('final-score').textContent = score;
+  $('final-combo').textContent = combo;
+  $('final-best').textContent = profile.bestScore;
+
+  const badgeMap = Object.fromEntries(BADGES.map(b=>[b.id,b]));
+  let html = '';
+  newBadges.forEach(id=>{
+    const b = badgeMap[id];
+    html += `<div class="unlock-toast">🎉 あたらしいバッジ「${b.icon} ${b.name}」を かくとく！</div>`;
+  });
+  newChars.forEach(c=>{
+    html += `<div class="unlock-toast">🎉 あたらしいキャラクター「${c.emoji} ${c.name}」が つかえるように！</div>`;
+  });
+  $('unlock-list').innerHTML = html;
+
+  $('name-input').value = '';
+  $('submit-score-btn').disabled = false;
+  $('submit-score-btn').textContent = 'ランキングに とうろく';
+}
+
+$('submit-score-btn').addEventListener('click', async ()=>{
+  const raw = $('name-input').value.trim();
+  const name = raw ? raw.slice(0,8) : 'なぞのプレイヤー';
+  $('submit-score-btn').disabled = true;
+  $('submit-score-btn').textContent = 'とうろくちゅう…';
+  const ok = await submitScore(name, lastResultScore, lastResultWorld);
+  if(ok){
+    $('submit-score-btn').textContent = 'とうろくかんりょう！✅';
+    if(!profile.unlockedBadges.includes('ranked')){
+      profile.unlockedBadges.push('ranked');
+      $('unlock-list').innerHTML += `<div class="unlock-toast">🎉 あたらしいバッジ「🌍 せかいデビュー」を かくとく！</div>`;
+      await saveProfile();
+      renderProfileBar();
+    }
+  } else {
+    $('submit-score-btn').textContent = 'とうろくできませんでした';
+    setTimeout(()=>{ $('submit-score-btn').disabled=false; $('submit-score-btn').textContent='ランキングに とうろく'; }, 1500);
+  }
+});
+
+/* =================== Album =================== */
+let albumTab = 'chars';
+function renderAlbum(){
+  const grid = $('album-grid');
+  grid.innerHTML = '';
+  if(albumTab === 'chars'){
+    CHARACTERS.forEach(c=>{
+      const unlocked = profile.unlockedChars.includes(c.emoji);
+      const div = document.createElement('div');
+      div.className = 'album-item'+(unlocked?' selectable':' locked')+(profile.activeChar===c.emoji?' active-char':'');
+      div.innerHTML = `<div class="emoji">${unlocked?c.emoji:'❓'}</div><div class="name">${unlocked?c.name:'？？？'}</div>
+        <div class="desc">${unlocked ? (profile.activeChar===c.emoji?'そうびちゅう':'タップでそうび') : 'ほし '+c.cost+' で かいほう'}</div>`;
+      if(unlocked){
+        div.addEventListener('click', async ()=>{
+          profile.activeChar = c.emoji;
+          await saveProfile();
+          updateCharPreview();
+          renderAlbum();
+        });
+      }
+      grid.appendChild(div);
+    });
+  } else {
+    BADGES.forEach(b=>{
+      const unlocked = profile.unlockedBadges.includes(b.id);
+      const div = document.createElement('div');
+      div.className = 'album-item'+(unlocked?'':' locked');
+      div.innerHTML = `<div class="emoji">${unlocked?b.icon:'❓'}</div><div class="name">${unlocked?b.name:'？？？'}</div>
+        <div class="desc">${unlocked?b.desc:'まだ ひみつ'}</div>`;
+      grid.appendChild(div);
+    });
+  }
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    albumTab = btn.dataset.tab;
+    renderAlbum();
+  });
+});
+$('reset-btn').addEventListener('click', async ()=>{
+  if(!confirm('ほんとうに データを ぜんぶ リセットしますか？（もとに もどせません）')) return;
+  profile = defaultProfile();
+  await saveProfile();
+  renderProfileBar(); updateCharPreview(); renderAlbum();
+  alert('リセットしました。');
+});
+
+/* =================== Navigation wiring =================== */
+document.querySelectorAll('[data-back]').forEach(btn=>{
+  btn.addEventListener('click', ()=> showScreen(btn.dataset.back));
+});
+$('start-btn').addEventListener('click', ()=>{ selectedDiff=null; buildWorldGrid(); showScreen('screen-world'); });
+$('album-btn').addEventListener('click', ()=>{ albumTab='chars'; document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab==='chars')); renderAlbum(); showScreen('screen-album'); });
+$('lb-btn').addEventListener('click', ()=>{ showScreen('screen-leaderboard'); loadLeaderboard(); });
+$('lb-refresh').addEventListener('click', loadLeaderboard);
+
+$('retry-btn').addEventListener('click', ()=>{
+  if(lastResultWorld){
+    const w = WORLDS.find(x=>x.id===lastResultWorld);
+    startGame(w, selectedDiff || 'easy');
+  } else showScreen('screen-title');
+});
+$('change-world-btn').addEventListener('click', ()=>{ buildWorldGrid(); showScreen('screen-world'); });
+$('result-title-btn').addEventListener('click', ()=> showScreen('screen-title'));
+
+$('quit-btn').addEventListener('click', ()=>{
+  if(!state) return;
+  if(!confirm('ゲームを やめて タイトルに もどりますか？')) return;
+  cancelAnimationFrame(rafId);
+  gameArea.querySelectorAll('.word,.particle').forEach(el=>el.remove());
+  state = null;
+  showScreen('screen-title');
+});
+
+$('sound-toggle').addEventListener('click', async ()=>{
+  ensureAudio();
+  profile.soundOn = !profile.soundOn;
+  applySound();
+  await saveProfile();
+  if(profile.soundOn) beep(660,0.08,'triangle',0.12);
+});
+
+window.addEventListener('keydown', e=>{
+  if($('name-input') === document.activeElement) return; // don't hijack typing in nickname field
+  handleKey(e);
+});
+$('name-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') $('submit-score-btn').click();
+});
+
+/* =================== Init =================== */
+(async function init(){
+  await loadProfile();
+  buildWorldGrid();
+  showScreen('screen-title');
+})();
+
+})();
+</script>
+</body>
+</html>
