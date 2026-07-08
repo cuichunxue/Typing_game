@@ -29,8 +29,13 @@
   #app{position:relative;z-index:1;width:100%;height:100vh;height:100dvh;}
 
   /* ---------- generic screens ---------- */
-  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-start;
     padding:22px;padding-bottom:max(22px, calc(22px + env(safe-area-inset-bottom)));text-align:center;overflow-y:auto;}
+  /* flex spacers center short content vertically, but collapse to zero when the
+     content is taller than the screen - unlike justify-content:center, which
+     would push the overflowing top out of reach of scrolling */
+  .screen:not(.screen-game)::before,
+  .screen:not(.screen-game)::after{content:"";flex:1 1 0;}
   .screen.active{display:flex;}
   .screen h1.game-title{font-size:clamp(26px,5vw,48px);margin:0 0 4px;letter-spacing:1px;
     background:linear-gradient(90deg,var(--yellow),var(--pink) 55%,var(--purple));
@@ -193,6 +198,9 @@
   .result-actions{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap;}
   .coach-tip{font-size:12.5px;color:var(--mint);background:rgba(91,231,176,.1);
     border:1px solid rgba(91,231,176,.35);border-radius:12px;padding:8px 12px;margin:10px 0 0;line-height:1.6;}
+  .fact-box{color:var(--yellow);background:rgba(255,217,61,.08);border-color:rgba(255,217,61,.35);}
+  .album-world-label{width:100%;text-align:left;font-family:'Yusei Magic',sans-serif;
+    color:var(--yellow);font-size:14px;margin:12px 0 0;}
 
   /* ---------- growth record (album stats tab) ---------- */
   .stats-panel{width:100%;max-width:480px;background:var(--panel);border:2px solid var(--panel-border);
@@ -217,7 +225,7 @@
   .lb-score{font-family:'Yusei Magic',sans-serif;color:var(--mint);}
 
   /* ---------- album ---------- */
-  .tabs{display:flex;gap:8px;margin:8px 0;}
+  .tabs{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;justify-content:center;}
   .tab-btn{background:rgba(255,255,255,.08);border:2px solid transparent;color:var(--white);border-radius:999px;
     padding:8px 18px;font-size:13px;cursor:pointer;font-family:'Yusei Magic',sans-serif;}
   .tab-btn.active{border-color:var(--yellow);color:var(--yellow);}
@@ -353,6 +361,7 @@
       <div class="result-row"><span>タイピングのはやさ</span><b id="final-kpm">-</b></div>
       <div class="result-row"><span>タイピングレベル</span><b id="final-level">-</b></div>
       <p class="coach-tip" id="coach-tip"></p>
+      <p class="coach-tip fact-box" id="fact-box" style="display:none;"></p>
       <div id="unlock-list"></div>
       <div id="rank-section">
         <div class="name-row">
@@ -382,6 +391,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="chars">キャラクター</button>
       <button class="tab-btn" data-tab="badges">バッジ</button>
+      <button class="tab-btn" data-tab="words">ことばずかん</button>
       <button class="tab-btn" data-tab="stats">せいちょうきろく</button>
     </div>
     <div class="album-grid" id="album-grid"></div>
@@ -398,26 +408,83 @@
 
 /* =================== DATA =================== */
 const WORLDS = [
+  /* word entry: [kana, romaji, emoji, english, fun-fact] - the last 3 power the
+     ことばずかん collection (typing practice doubles as vocabulary/knowledge). */
   { id:'w1', name:'どうぶつの島', icon:'🐾', desc:'どうぶつの なまえで れんしゅう', accent:'#5be7b0',
-    words:[["ねこ","neko"],["いぬ","inu"],["くま","kuma"],["とり","tori"],["うし","ushi"],["ぶた","buta"],
-      ["さる","saru"],["ぱんだ","panda"],["きつね","kitsune"],["うさぎ","usagi"],["らいおん","raion"],
-      ["しまうま","shimauma"],["ぺんぎん","pengin"],["かんがるー","kangaruu"],["こあら","koara"],
-      ["ふくろう","fukurou"],["かめれおん","kamereon"],["とかげ","tokage"],["くじゃく","kujaku"]] },
+    words:[["ねこ","neko","🐱","cat","1にちの はんぶんいじょう ねむって すごすよ"],
+      ["いぬ","inu","🐶","dog","はなが よくて においで ともだちが わかるよ"],
+      ["くま","kuma","🐻","bear","ふゆのあいだ あなの なかで ねむるよ"],
+      ["とり","tori","🐦","bird","ほねが かるいから そらを とべるんだよ"],
+      ["うし","ushi","🐮","cow","いぶくろが 4つも あるんだよ"],
+      ["ぶた","buta","🐷","pig","きれいずきで あたまも いいんだよ"],
+      ["さる","saru","🐵","monkey","しっぽで きに ぶらさがれる さるも いるよ"],
+      ["ぱんだ","panda","🐼","panda","1にちじゅう ささを たべているよ"],
+      ["きつね","kitsune","🦊","fox","ふさふさの しっぽで さむさを ふせぐよ"],
+      ["うさぎ","usagi","🐰","rabbit","ながい みみで ちいさな おとも きこえるよ"],
+      ["らいおん","raion","🦁","lion","なきごえは 8キロさきまで とどくよ"],
+      ["しまうま","shimauma","🦓","zebra","しまもようは 1とうずつ ぜんぶ ちがうよ"],
+      ["ぺんぎん","pengin","🐧","penguin","とべないけど およぎは せんしゅきゅうだよ"],
+      ["かんがるー","kangaruu","🦘","kangaroo","あかちゃんを おなかの ふくろで そだてるよ"],
+      ["こあら","koara","🐨","koala","ユーカリの はっぱだけを たべるよ"],
+      ["ふくろう","fukurou","🦉","owl","くびが うしろまで ぐるっと まわるよ"],
+      ["かめれおん","kamereon","🦎","chameleon","からだの いろを かえられるよ"],
+      ["とかげ","tokage","🦎","lizard","しっぽが きれても また はえてくるよ"],
+      ["くじゃく","kujaku","🦚","peacock","おすは はねを ひろげて おしゃれじまんするよ"]] },
   { id:'w2', name:'おやつ惑星', icon:'🍩', desc:'たべものの なまえで れんしゅう', accent:'#ff9a5a',
-    words:[["あめ","ame"],["がむ","gamu"],["けーき","keeki"],["ぷりん","purin"],["どーなつ","doonatsu"],
-      ["くっきー","kukkii"],["ちょこれーと","chokoreeto"],["あいすくりーむ","aisukuriimu"],
-      ["たこやき","takoyaki"],["おにぎり","onigiri"],["すいか","suika"],["ぶどう","budou"],
-      ["めろん","meron"],["ばなな","banana"],["いちご","ichigo"],["ぱふぇ","pafe"],["まかろん","makaron"],["ぜりー","zerii"]] },
+    words:[["あめ","ame","🍭","candy","なめると あまくて げんきが でるね"],
+      ["がむ","gamu","🍬","gum","かむと あたまが すっきりするんだって"],
+      ["けーき","keeki","🍰","cake","たんじょうびに かかせない おかしだね"],
+      ["ぷりん","purin","🍮","pudding","たまごと ぎゅうにゅうで できているよ"],
+      ["どーなつ","doonatsu","🍩","donut","まんなかの あなは はやく あげる くふうだよ"],
+      ["くっきー","kukkii","🍪","cookie","オランダの ことばが なまえの ゆらいだよ"],
+      ["ちょこれーと","chokoreeto","🍫","chocolate","カカオという まめから つくられるよ"],
+      ["あいすくりーむ","aisukuriimu","🍨","ice cream","むかしは おうさまの おかしだったよ"],
+      ["たこやき","takoyaki","🐙","takoyaki","おおさかうまれの まるい たべものだよ"],
+      ["おにぎり","onigiri","🍙","rice ball","1000ねん いじょうまえから たべられているよ"],
+      ["すいか","suika","🍉","watermelon","90パーセントが みずで できているよ"],
+      ["ぶどう","budou","🍇","grapes","ほすと ほしぶどうに へんしんするよ"],
+      ["めろん","meron","🍈","melon","あみめは おおきくなる ときに できた あとだよ"],
+      ["ばなな","banana","🍌","banana","きに みえるけど じつは くさなんだよ"],
+      ["いちご","ichigo","🍓","strawberry","つぶつぶの ひとつひとつが みなんだよ"],
+      ["ぱふぇ","pafe","🍧","parfait","フランスごで『かんぺき』という いみだよ"],
+      ["まかろん","makaron","🧁","macaron","フランスの ちいさくて かわいい おかしだよ"],
+      ["ぜりー","zerii","🥣","jelly","ぷるぷるは ゼラチンの おかげだよ"]] },
   { id:'w3', name:'のりもの銀河', icon:'🚗', desc:'のりものの なまえで れんしゅう', accent:'#5aa9ff',
-    words:[["くるま","kuruma"],["でんしゃ","densha"],["ひこうき","hikouki"],["ふね","fune"],["ばす","basu"],
-      ["とらっく","torakku"],["じてんしゃ","jitensha"],["ろけっと","roketto"],["へりこぷたー","herikoputaa"],
-      ["しんかんせん","shinkansen"],["ちかてつ","chikatetsu"],["きゅうきゅうしゃ","kyuukyuusha"],
-      ["しょうぼうしゃ","shoubousha"],["たくしー","takushii"],["とらくたー","torakutaa"],["よっと","yotto"]] },
+    words:[["くるま","kuruma","🚗","car","せかいに 10おくだい いじょう はしっているよ"],
+      ["でんしゃ","densha","🚃","train","にほんの でんしゃは じかんに せいかくだよ"],
+      ["ひこうき","hikouki","✈️","airplane","くもより たかいところを とんでいるよ"],
+      ["ふね","fune","🚢","ship","おもたい てつでも うくのは ふしぎだね"],
+      ["ばす","basu","🚌","bus","いちどに たくさんの ひとを はこべるよ"],
+      ["とらっく","torakku","🚚","truck","おみせの しなものを はこんでくれるよ"],
+      ["じてんしゃ","jitensha","🚲","bicycle","ペダルの ちからだけで すすむ エコな のりものだよ"],
+      ["ろけっと","roketto","🚀","rocket","おとよりも ずっと はやく とぶよ"],
+      ["へりこぷたー","herikoputaa","🚁","helicopter","まうえに まっすぐ とびあがれるよ"],
+      ["しんかんせん","shinkansen","🚄","bullet train","じそく300キロで はしるよ"],
+      ["ちかてつ","chikatetsu","🚇","subway","まちの じめんの したを はしっているよ"],
+      ["きゅうきゅうしゃ","kyuukyuusha","🚑","ambulance","びょうきの ひとを たすけに いくよ"],
+      ["しょうぼうしゃ","shoubousha","🚒","fire engine","かじを けすために かけつけるよ"],
+      ["たくしー","takushii","🚕","taxi","いきたい ばしょまで つれていってくれるよ"],
+      ["とらくたー","torakutaa","🚜","tractor","はたけを たがやす ちからもちだよ"],
+      ["よっと","yotto","⛵","yacht","かぜの ちからだけで うみを すすむよ"]] },
   { id:'w4', name:'きせつのもり', icon:'🍁', desc:'きせつ・ぎょうじの ことばで れんしゅう', accent:'#b98eff',
-    words:[["はな","hana"],["さくら","sakura"],["つき","tsuki"],["ほし","hoshi"],["ゆき","yuki"],["あめ","ame"],
-      ["にじ","niji"],["たいよう","taiyou"],["かぜ","kaze"],["もみじ","momiji"],["ひまわり","himawari"],
-      ["たなばた","tanabata"],["おしょうがつ","oshougatsu"],["はなび","hanabi"],["うんどうかい","undoukai"],
-      ["なつやすみ","natsuyasumi"],["ゆきだるま","yukidaruma"],["くりすます","kurisumasu"]] },
+    words:[["はな","hana","🌷","flower","いろや かたちで むしを よんでいるよ"],
+      ["さくら","sakura","🌸","cherry blossom","はるに さいて 1しゅうかんほどで ちるよ"],
+      ["つき","tsuki","🌙","moon","まいにち すこしずつ かたちが かわって みえるよ"],
+      ["ほし","hoshi","⭐","star","よぞらの ほしは とおくの たいようなんだよ"],
+      ["ゆき","yuki","❄️","snow","けっしょうは ぜんぶ ちがう かたちだよ"],
+      ["あめ","ame","☔","rain","くもの なかの みずの つぶが おちてくるんだよ"],
+      ["にじ","niji","🌈","rainbow","あめあがりに 7しょくの はしが かかるよ"],
+      ["たいよう","taiyou","☀️","sun","ちきゅうを あたためてくれる おおきな ほしだよ"],
+      ["かぜ","kaze","🍃","wind","めに みえないけど くうきが うごいているんだよ"],
+      ["もみじ","momiji","🍁","autumn leaves","あきになると はっぱが あかく そまるよ"],
+      ["ひまわり","himawari","🌻","sunflower","たいようの ほうを むいて さくよ"],
+      ["たなばた","tanabata","🎋","Star Festival","ねがいごとを たんざくに かいて かざるよ"],
+      ["おしょうがつ","oshougatsu","🎍","New Year","1ねんの はじまりを おいわいするよ"],
+      ["はなび","hanabi","🎆","fireworks","よぞらに おおきな はなが さくみたいだね"],
+      ["うんどうかい","undoukai","🏃","sports day","みんなで はしって きょうそうする ひだよ"],
+      ["なつやすみ","natsuyasumi","🌊","summer vacation","なつの ながい おやすみ。ぼうけんの チャンス！"],
+      ["ゆきだるま","yukidaruma","⛄","snowman","ゆきを ころがして つくる ふゆの ともだちだよ"],
+      ["くりすます","kurisumasu","🎄","Christmas","サンタさんが やってくる ふゆの ぎょうじだよ"]] },
   { id:'w5', name:'ことばの神殿', icon:'📜', desc:'みじかい ぶんしょうに ちょうせん', accent:'#ffd93d', goalMul:0.7, speedMul:0.78,
     words:[["げんきにあそぼう","genkiniasobou"],["ほしぞらをみあげる","hoshizoraomiageru"],
       ["たのしいなつやすみ","tanoshiinatsuyasumi"],["おおきなにじがでた","ookinanijigadeta"],
@@ -426,6 +493,8 @@ const WORLDS = [
       ["そらにひこうきがとんでいる","soranihikoukigatondeiru"],["うみでおよぐのがだいすき","umideoyogunogadaisuki"],
       ["あしたはきっといいひになる","ashitahakittoiihininaru"],["はやくじょうずになりたいな","hayakujouzuninaritaina"]] }
 ];
+
+const COLLECTIBLE_TOTAL = WORLDS.reduce((n,w)=> n + w.words.filter(x=>x.length>=5).length, 0);
 
 const DIFF_SETTINGS = {
   easy:   { fallSpeed:32, spawnInterval:2.6, maxConcurrent:2, speedStep:2.5, spawnFloor:1.4, goal:15 },
@@ -458,7 +527,9 @@ const BADGES = [
   { id:'streak30', icon:'👑', name:'つきのちょうじん', desc:'30にちれんぞくで ログインした' },
   { id:'daily1', icon:'🎯', name:'デイリーマスター', desc:'きょうのチャレンジを たっせいした' },
   { id:'nomiss', icon:'✨', name:'ノーミスタイパー', desc:'30もじいじょうを 1どもミスせずに うった' },
-  { id:'speed100', icon:'💨', name:'スピードスター', desc:'1ぷんかんに 100もじの はやさで うった' }
+  { id:'speed100', icon:'💨', name:'スピードスター', desc:'1ぷんかんに 100もじの はやさで うった' },
+  { id:'words30', icon:'📚', name:'ことばはかせ', desc:'ことばずかんに 30この ことばを あつめた' },
+  { id:'wordsall', icon:'🏛️', name:'ことばコンプリート', desc:'ことばずかんの ことばを ぜんぶ あつめた' }
 ];
 
 /* Lifetime typing level: thresholds are total correct keystrokes. The first
@@ -505,7 +576,7 @@ function defaultProfile(){
     unlockedChars:['🧑‍🚀'], activeChar:'🧑‍🚀', unlockedBadges:[],
     worldsCleared:[], soundOn:true,
     lastPlayDate:null, loginStreak:0, longestStreak:0, dailyChallenge:null,
-    totalTyped:0, keyMisses:{}, history:[] };
+    totalTyped:0, keyMisses:{}, history:[], collectedWords:[] };
 }
 let profile = defaultProfile();
 
@@ -712,7 +783,8 @@ function renderProfileBar(){
     `<span>さいこうスコア <b>${profile.bestScore}</b></span>` +
     `<span>ほし <b>${profile.totalStars}</b> ⭐</span>` +
     `<span>プレイかいすう <b>${profile.plays}</b></span>` +
-    `<span>バッジ <b>${profile.unlockedBadges.length}/${BADGES.length}</b></span>`;
+    `<span>バッジ <b>${profile.unlockedBadges.length}/${BADGES.length}</b></span>` +
+    `<span>ことば <b>${(profile.collectedWords||[]).length}/${COLLECTIBLE_TOTAL}</b> 📖</span>`;
   renderDailyCard();
 }
 function updateCharPreview(){ $('char-preview').textContent = profile.activeChar; }
@@ -788,6 +860,7 @@ function startGame(world, diff){
     spawnInterval: cfg.spawnInterval,
     spawnTimer: 0.6,
     keysOk:0, keysMiss:0, playSeconds:0,
+    newWords:0, facts:[],
     cfg
   };
   gameArea.className = 'game-area world-' + world.id.replace('w','');
@@ -821,11 +894,11 @@ function pickWord(){
     const focus = list.filter(w => wk.some(k => w[1].includes(k)));
     if(focus.length){
       const f = focus[Math.floor(Math.random()*focus.length)];
-      return { kana:f[0], romaji:f[1] };
+      return { kana:f[0], romaji:f[1], emoji:f[2], en:f[3], fact:f[4] };
     }
   }
   const w = list[Math.floor(Math.random()*list.length)];
-  return { kana:w[0], romaji:w[1] };
+  return { kana:w[0], romaji:w[1], emoji:w[2], en:w[3], fact:w[4] };
 }
 function spawnWord(){
   if(state.words.length >= state.cfg.maxConcurrent) return;
@@ -838,7 +911,8 @@ function spawnWord(){
   const margin = 60;
   const left = margin + Math.random()*Math.max(10, areaW - margin*2);
   el.style.left = left+'px';
-  state.words.push({ romaji:data.romaji, typed:'', el, y:-50, x:left });
+  state.words.push({ kana:data.kana, romaji:data.romaji, emoji:data.emoji, en:data.en, fact:data.fact,
+    typed:'', el, y:-50, x:left });
 }
 function renderWordText(w){
   const done = w.romaji.slice(0, w.typed.length);
@@ -925,8 +999,20 @@ function completeWord(w){
   state.cleared++;
 
   spawnParticles(cx, cy, tier>=2?'#ffd93d':'#5be7b0', 14 + tier*6);
-  popScoreText(cx, cy, '+'+gained, COMBO_TIER_COLORS[tier]);
+  popScoreText(cx, cy, (w.emoji ? w.emoji+' ' : '')+'+'+gained, COMBO_TIER_COLORS[tier]);
   flashScreen();
+
+  // ことばずかん collection: first time typing this word registers it
+  let isNewWord = false;
+  if(w.fact){
+    const key = state.world.id + ':' + w.kana;
+    if(!profile.collectedWords.includes(key)){
+      profile.collectedWords.push(key);
+      state.newWords++;
+      isNewWord = true;
+    }
+    state.facts.push(w);
+  }
 
   const milestone = !!COMBO_CHEERS[state.combo];
   bounceMascot('happy', milestone);
@@ -938,6 +1024,7 @@ function completeWord(w){
   vibrate(milestone ? [20,40,20,40,30] : 12);
 
   if(milestone) showToast(COMBO_CHEERS[state.combo], true);
+  else if(isNewWord) showToast('📖 あたらしいことば ゲット！', false);
   else showToast(CHEERS[Math.floor(Math.random()*CHEERS.length)], false);
 
   if(state.cleared % 5 === 0 && state.cleared < state.goal){
@@ -1074,9 +1161,11 @@ async function finishStage(result){
   }
   await saveProfile();
 
+  const runFact = state.facts.length ? state.facts[Math.floor(Math.random()*state.facts.length)] : null;
+
   if(result==='clear') sfxClear(); else sfxDefeat();
   renderResult(result, stars, runScore, runCombo, newBadges, newChars, worldId, dailyBonusStars,
-    { kpm, acc, lvl, leveledUp, keysTotal });
+    { kpm, acc, lvl, leveledUp, keysTotal, newWords:state.newWords, fact:runFact });
   showScreen('screen-result');
   renderProfileBar();
   state = null;
@@ -1093,6 +1182,9 @@ function checkBadges(result, livesRemaining, runScore, acc, kpm, keysTotal){
   if(result==='clear' && profile.worldsCleared.length>=5) unlock('allworlds');
   if(acc>=1 && keysTotal>=30) unlock('nomiss');
   if(kpm>=100 && keysTotal>=30) unlock('speed100');
+  const collected = (profile.collectedWords||[]).length;
+  if(collected>=30) unlock('words30');
+  if(collected>=COLLECTIBLE_TOTAL) unlock('wordsall');
   return newly;
 }
 function checkCharUnlocks(){
@@ -1137,8 +1229,19 @@ function renderResult(result, stars, score, combo, newBadges, newChars, worldId,
   $('final-level').textContent = `${stats.lvl.icon} Lv.${stats.lvl.lv} ${stats.lvl.name}`;
   $('coach-tip').textContent = '💡 ' + coachTip(stats);
 
+  const fb = $('fact-box');
+  if(stats.fact){
+    fb.style.display = 'block';
+    fb.textContent = `🎓 まめちしき：${stats.fact.emoji}「${stats.fact.kana}」は えいごで ${stats.fact.en}。${stats.fact.fact}`;
+  } else {
+    fb.style.display = 'none';
+  }
+
   const badgeMap = Object.fromEntries(BADGES.map(b=>[b.id,b]));
   let html = '';
+  if(stats.newWords>0){
+    html += `<div class="unlock-toast">📖 あたらしいことばを ${stats.newWords}こ ずかんに とうろく！（${(profile.collectedWords||[]).length}/${COLLECTIBLE_TOTAL}）</div>`;
+  }
   if(stats.leveledUp){
     html += `<div class="unlock-toast">🆙 レベルアップ！「${stats.lvl.icon} ${stats.lvl.name}」に なった！</div>`;
   }
@@ -1209,6 +1312,26 @@ function renderAlbum(){
       div.innerHTML = `<div class="emoji">${unlocked?b.icon:'❓'}</div><div class="name">${unlocked?b.name:'？？？'}</div>
         <div class="desc">${unlocked?b.desc:'まだ ひみつ'}</div>`;
       grid.appendChild(div);
+    });
+  } else if(albumTab === 'words'){
+    const collected = profile.collectedWords||[];
+    WORLDS.forEach(wd=>{
+      const collectibles = wd.words.filter(x=>x.length>=5);
+      if(!collectibles.length) return;
+      const got = collectibles.filter(x=>collected.includes(wd.id+':'+x[0])).length;
+      const label = document.createElement('div');
+      label.className = 'album-world-label';
+      label.textContent = `${wd.icon} ${wd.name}（${got}/${collectibles.length}）`;
+      grid.appendChild(label);
+      collectibles.forEach(x=>{
+        const has = collected.includes(wd.id+':'+x[0]);
+        const div = document.createElement('div');
+        div.className = 'album-item'+(has?'':' locked');
+        div.innerHTML = has
+          ? `<div class="emoji">${x[2]}</div><div class="name">${x[0]}</div><div class="desc">えいごで <b>${x[3]}</b><br>${x[4]}</div>`
+          : `<div class="emoji">❓</div><div class="name">？？？</div><div class="desc">タイピングで ゲットしよう！</div>`;
+        grid.appendChild(div);
+      });
     });
   } else {
     grid.appendChild(buildStatsPanel());
