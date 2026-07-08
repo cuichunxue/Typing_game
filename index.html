@@ -64,6 +64,22 @@
   .title-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px;}
   .char-preview{font-size:44px;filter:drop-shadow(0 0 14px rgba(255,217,61,.4));}
 
+  .daily-card{width:100%;max-width:420px;background:rgba(255,217,61,.1);border:2px solid rgba(255,217,61,.4);
+    border-radius:16px;padding:10px 16px;margin:4px 0;font-size:12.5px;line-height:1.6;text-align:left;}
+  .daily-card .streak-line{font-family:'Yusei Magic',sans-serif;color:var(--yellow);font-size:14px;margin-bottom:2px;}
+  .daily-card .challenge-line{color:#e5e0ff;}
+  .daily-card .challenge-line.done{color:var(--mint);}
+
+  .modal-overlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    background:rgba(5,4,20,.72);padding:22px;}
+  .modal-overlay.show{display:flex;}
+  .modal-card{background:var(--panel);border:2px solid var(--panel-border);border-radius:24px;padding:26px 30px;
+    max-width:360px;width:100%;text-align:center;animation:modalPop .4s ease;}
+  @keyframes modalPop{0%{opacity:0;transform:scale(.7) translateY(20px);}100%{opacity:1;transform:scale(1) translateY(0);}}
+  .modal-card .modal-icon{font-size:46px;margin-bottom:4px;}
+  .modal-card h2{font-family:'Yusei Magic',sans-serif;color:var(--yellow);font-size:22px;margin:4px 0;}
+  .modal-card p{color:#e5e0ff;font-size:14px;line-height:1.7;margin:8px 0 16px;}
+
   /* ---------- card grids (world / difficulty) ---------- */
   .card-grid{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:10px;max-width:900px;}
   .pick-card{width:168px;padding:18px 14px;border-radius:20px;cursor:pointer;position:relative;
@@ -224,6 +240,15 @@
 <div id="stars"></div>
 <button id="sound-toggle" class="icon-btn" title="サウンド切りかえ">🔊</button>
 
+<div id="daily-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-icon">🎁</div>
+    <h2 id="daily-modal-title">ログインボーナス！</h2>
+    <p id="daily-modal-body"></p>
+    <button class="btn" id="daily-modal-close">やったー！</button>
+  </div>
+</div>
+
 <div id="app">
 
   <!-- TITLE -->
@@ -236,6 +261,7 @@
     <p class="sub">ぎんがを たびして、おちてくる ことばを タイピングで まもろう！<br>ワールドを すすんで、キャラクターと バッジを あつめよう。</p>
     <div id="char-preview" class="char-preview">🧑‍🚀</div>
     <div class="profile-bar" id="profile-bar">よみこみちゅう…</div>
+    <div class="daily-card" id="daily-card"></div>
     <div class="title-actions">
       <button class="btn" id="start-btn">🚀 ぼうけんに でる</button>
       <button class="btn purple" id="album-btn">📖 ずかん</button>
@@ -401,7 +427,11 @@ const BADGES = [
   { id:'combo20', icon:'⚡', name:'20れんぞく', desc:'20れんぞくで せいかいした' },
   { id:'score1500', icon:'🏆', name:'ハイスコア', desc:'1かいで1500てん いじょう とった' },
   { id:'allworlds', icon:'🗺️', name:'たびびと', desc:'5つのワールドを すべてクリアした' },
-  { id:'ranked', icon:'🌍', name:'せかいデビュー', desc:'せかいランキングに とうろくした' }
+  { id:'ranked', icon:'🌍', name:'せかいデビュー', desc:'せかいランキングに とうろくした' },
+  { id:'streak3', icon:'🔥', name:'3にちれんぞく', desc:'3にちれんぞくで ログインした' },
+  { id:'streak7', icon:'🌟', name:'1しゅうかんれんぞく', desc:'7にちれんぞくで ログインした' },
+  { id:'streak30', icon:'👑', name:'つきのちょうじん', desc:'30にちれんぞくで ログインした' },
+  { id:'daily1', icon:'🎯', name:'デイリーマスター', desc:'きょうのチャレンジを たっせいした' }
 ];
 
 /* =================== STORAGE ===================== */
@@ -426,7 +456,8 @@ function noteStorageUnavailable(){
 function defaultProfile(){
   return { bestScore:0, bestCombo:0, totalStars:0, plays:0,
     unlockedChars:['🧑‍🚀'], activeChar:'🧑‍🚀', unlockedBadges:[],
-    worldsCleared:[], soundOn:true };
+    worldsCleared:[], soundOn:true,
+    lastPlayDate:null, loginStreak:0, longestStreak:0, dailyChallenge:null };
 }
 let profile = defaultProfile();
 
@@ -444,6 +475,65 @@ async function saveProfile(){
   if(!HAS_STORAGE) return;
   try{ await window.storage.set('profile', JSON.stringify(profile), false); }
   catch(e){ console.warn('progress could not be saved; continuing in session-only mode', e); noteStorageUnavailable(); }
+}
+
+/* =================== Daily streak & challenge ===================== */
+function pad2(n){ return String(n).padStart(2,'0'); }
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+function daysBetween(a,b){
+  return Math.round((new Date(b+'T00:00:00') - new Date(a+'T00:00:00')) / 86400000);
+}
+function dailyChallengeWorld(dateStr){
+  const dayIndex = Math.floor(new Date(dateStr+'T00:00:00').getTime()/86400000);
+  return WORLDS[dayIndex % WORLDS.length];
+}
+// Runs once per app load: bumps the login streak, hands out a small star bonus for
+// showing up today, and (re)rolls the day's challenge world if the date changed.
+function processDailyLogin(){
+  const today = todayStr();
+  let bonusStars = 0;
+  let isNewDay = false;
+  if(profile.lastPlayDate !== today){
+    isNewDay = true;
+    profile.loginStreak = (profile.lastPlayDate && daysBetween(profile.lastPlayDate, today) === 1)
+      ? profile.loginStreak + 1 : 1;
+    profile.longestStreak = Math.max(profile.longestStreak||0, profile.loginStreak);
+    profile.lastPlayDate = today;
+    bonusStars = Math.min(profile.loginStreak, 7);
+    profile.totalStars += bonusStars;
+  }
+  if(!profile.dailyChallenge || profile.dailyChallenge.date !== today){
+    profile.dailyChallenge = { date: today, worldId: dailyChallengeWorld(today).id, claimed:false };
+  }
+  const newBadges = [];
+  function unlock(id){ if(!profile.unlockedBadges.includes(id)){ profile.unlockedBadges.push(id); newBadges.push(id); } }
+  if(profile.loginStreak>=3) unlock('streak3');
+  if(profile.loginStreak>=7) unlock('streak7');
+  if(profile.loginStreak>=30) unlock('streak30');
+  return { bonusStars, isNewDay, newBadges };
+}
+function renderDailyCard(){
+  const card = $('daily-card');
+  if(!card || !profile.dailyChallenge) return;
+  const world = WORLDS.find(w=>w.id===profile.dailyChallenge.worldId) || WORLDS[0];
+  const done = profile.dailyChallenge.claimed;
+  card.innerHTML =
+    `<div class="streak-line">🔥 ${profile.loginStreak}にちれんぞく プレイちゅう！</div>` +
+    `<div class="challenge-line${done?' done':''}">🎯 きょうのチャレンジ：${world.icon} 「${world.name}」をクリア ${done?'✅ たっせい！':'（★3ボーナス）'}</div>`;
+}
+function showDailyModal(bonusStars, newBadges){
+  const badgeMap = Object.fromEntries(BADGES.map(b=>[b.id,b]));
+  let body = `ログインありがとう！<br>🔥 ${profile.loginStreak}にちれんぞく プレイちゅう`;
+  if(bonusStars>0) body += `<br>⭐ ボーナス +${bonusStars}`;
+  newBadges.forEach(id=>{
+    const b = badgeMap[id];
+    if(b) body += `<br>🎉 あたらしいバッジ「${b.icon} ${b.name}」！`;
+  });
+  $('daily-modal-body').innerHTML = body;
+  $('daily-modal').classList.add('show');
 }
 
 async function loadLeaderboard(){
@@ -573,6 +663,7 @@ function renderProfileBar(){
     `<span>ほし <b>${profile.totalStars}</b> ⭐</span>` +
     `<span>プレイかいすう <b>${profile.plays}</b></span>` +
     `<span>バッジ <b>${profile.unlockedBadges.length}/${BADGES.length}</b></span>`;
+  renderDailyCard();
 }
 function updateCharPreview(){ $('char-preview').textContent = profile.activeChar; }
 
@@ -886,10 +977,19 @@ async function finishStage(result){
 
   const newBadges = checkBadges(result, state.lives, runScore);
   const newChars = checkCharUnlocks();
+
+  let dailyBonusStars = 0;
+  if(result==='clear' && profile.dailyChallenge && profile.dailyChallenge.date===todayStr() &&
+     !profile.dailyChallenge.claimed && profile.dailyChallenge.worldId===worldId){
+    profile.dailyChallenge.claimed = true;
+    dailyBonusStars = 3;
+    profile.totalStars += dailyBonusStars;
+    if(!profile.unlockedBadges.includes('daily1')){ profile.unlockedBadges.push('daily1'); newBadges.push('daily1'); }
+  }
   await saveProfile();
 
   if(result==='clear') sfxClear(); else sfxDefeat();
-  renderResult(result, stars, runScore, runCombo, newBadges, newChars, worldId);
+  renderResult(result, stars, runScore, runCombo, newBadges, newChars, worldId, dailyBonusStars);
   showScreen('screen-result');
   renderProfileBar();
   state = null;
@@ -918,7 +1018,7 @@ function checkCharUnlocks(){
 
 let lastResultScore = 0;
 let lastResultWorld = null;
-function renderResult(result, stars, score, combo, newBadges, newChars, worldId){
+function renderResult(result, stars, score, combo, newBadges, newChars, worldId, dailyBonusStars){
   lastResultScore = score; lastResultWorld = worldId;
   $('result-title').textContent = result==='clear' ? '🎉 ステージクリア！' : 'ざんねん…！';
   const starsRow = $('stars-row');
@@ -932,6 +1032,9 @@ function renderResult(result, stars, score, combo, newBadges, newChars, worldId)
 
   const badgeMap = Object.fromEntries(BADGES.map(b=>[b.id,b]));
   let html = '';
+  if(dailyBonusStars>0){
+    html += `<div class="unlock-toast">🎯 きょうのチャレンジ たっせい！ ⭐+${dailyBonusStars} ボーナス！</div>`;
+  }
   newBadges.forEach(id=>{
     const b = badgeMap[id];
     html += `<div class="unlock-toast">🎉 あたらしいバッジ「${b.icon} ${b.name}」を かくとく！</div>`;
@@ -1010,6 +1113,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 $('reset-btn').addEventListener('click', async ()=>{
   if(!confirm('ほんとうに データを ぜんぶ リセットしますか？（もとに もどせません）')) return;
   profile = defaultProfile();
+  processDailyLogin();
   await saveProfile();
   renderProfileBar(); updateCharPreview(); renderAlbum();
   alert('リセットしました。');
@@ -1069,6 +1173,9 @@ $('start-btn').addEventListener('click', ()=>{ selectedDiff=null; buildWorldGrid
 $('album-btn').addEventListener('click', ()=>{ albumTab='chars'; document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab==='chars')); renderAlbum(); showScreen('screen-album'); });
 $('lb-btn').addEventListener('click', ()=>{ showScreen('screen-leaderboard'); loadLeaderboard(); });
 $('lb-refresh').addEventListener('click', loadLeaderboard);
+$('daily-modal-close').addEventListener('click', ()=>{
+  $('daily-modal').classList.remove('show');
+});
 
 $('retry-btn').addEventListener('click', ()=>{
   if(lastResultWorld){
@@ -1116,8 +1223,12 @@ $('name-input').addEventListener('keydown', e=>{
 /* =================== Init =================== */
 (async function init(){
   await loadProfile();
+  const daily = processDailyLogin();
+  await saveProfile();
+  renderProfileBar();
   buildWorldGrid();
   showScreen('screen-title');
+  if(daily.isNewDay) showDailyModal(daily.bonusStars, daily.newBadges);
 })();
 
 })();
