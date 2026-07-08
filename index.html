@@ -83,7 +83,9 @@
   .hud-block{display:flex;flex-direction:column;align-items:center;font-family:'Yusei Magic',sans-serif;min-width:56px;}
   .hud-label{font-size:10px;color:#b7b0e6;}
   .hud-value{font-size:19px;color:var(--yellow);}
-  #combo-value{font-size:19px;color:var(--pink);}
+  #combo-value{font-size:19px;color:var(--pink);transition:color .25s,text-shadow .25s;display:inline-block;}
+  #combo-value.combo-pop{animation:comboPop .32s ease;}
+  @keyframes comboPop{0%{transform:scale(1);}45%{transform:scale(1.45);}100%{transform:scale(1);}}
   #lives{display:flex;gap:4px;font-size:20px;}
   .life{filter:drop-shadow(0 0 4px rgba(255,255,255,.5));transition:transform .2s;}
   .life.lost{opacity:.15;filter:none;transform:scale(.8);}
@@ -97,6 +99,10 @@
   #game-area{position:relative;flex:1;overflow:hidden;transition:background .4s;}
   #game-area.shake{animation:areaShake .3s;}
   @keyframes areaShake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+  #flash-overlay{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:0;
+    background:radial-gradient(circle at 50% 68%, var(--world-accent), transparent 70%);}
+  #flash-overlay.flash{animation:flashPulse .45s ease-out;}
+  @keyframes flashPulse{0%{opacity:.5;}100%{opacity:0;}}
   .game-area.world-1{background:radial-gradient(circle at 20% 15%,rgba(91,231,176,.16),transparent 45%),radial-gradient(circle at 80% 10%,rgba(91,231,176,.07),transparent 40%);--world-accent:#5be7b0;}
   .game-area.world-2{background:radial-gradient(circle at 20% 15%,rgba(255,154,90,.16),transparent 45%),radial-gradient(circle at 80% 10%,rgba(255,111,165,.09),transparent 40%);--world-accent:#ff9a5a;}
   .game-area.world-3{background:radial-gradient(circle at 20% 15%,rgba(90,169,255,.18),transparent 45%),radial-gradient(circle at 80% 10%,rgba(90,169,255,.08),transparent 40%);--world-accent:#5aa9ff;}
@@ -120,11 +126,19 @@
   #mascot{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:44px;transition:transform .18s;}
   #mascot.happy{animation:hop .35s ease;}
   #mascot.sad{animation:sadShake .4s ease;}
+  #mascot.mega{animation:megaHop .55s ease;}
+  #mascot.charged{animation:mascotAura 1s ease-in-out infinite;}
   @keyframes hop{0%{transform:translateX(-50%) translateY(0);}40%{transform:translateX(-50%) translateY(-22px) rotate(-6deg);}100%{transform:translateX(-50%) translateY(0);}}
+  @keyframes megaHop{0%{transform:translateX(-50%) translateY(0) scale(1);}40%{transform:translateX(-50%) translateY(-36px) scale(1.2) rotate(-10deg);}100%{transform:translateX(-50%) translateY(0) scale(1);}}
   @keyframes sadShake{0%,100%{transform:translateX(-50%);}30%{transform:translateX(-62%) rotate(-8deg);}60%{transform:translateX(-38%) rotate(8deg);}}
+  @keyframes mascotAura{0%,100%{filter:drop-shadow(0 0 8px var(--world-accent));}50%{filter:drop-shadow(0 0 22px var(--world-accent));}}
 
   .particle{position:absolute;width:8px;height:8px;border-radius:50%;pointer-events:none;animation:pop .55s ease-out forwards;}
   @keyframes pop{0%{transform:translate(0,0) scale(1);opacity:1;}100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0;}}
+  .score-pop{position:absolute;transform:translate(-50%,0);font-family:'Yusei Magic',sans-serif;font-weight:700;
+    font-size:16px;pointer-events:none;z-index:7;text-shadow:0 0 8px rgba(0,0,0,.5);animation:scorePop .75s ease-out forwards;}
+  @keyframes scorePop{0%{opacity:0;transform:translate(-50%,0) scale(.6);}12%{opacity:1;transform:translate(-50%,-8px) scale(1.15);}
+    100%{opacity:0;transform:translate(-50%,-54px) scale(1);}}
 
   #toast-container{position:absolute;top:64px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;
     align-items:center;gap:6px;pointer-events:none;z-index:8;width:100%;}
@@ -271,6 +285,7 @@
       <button class="btn ghost" id="quit-btn">やめる</button>
     </div>
     <div id="game-area">
+      <div id="flash-overlay"></div>
       <div id="levelup-banner"></div>
       <div id="toast-container"></div>
       <div id="ground"></div>
@@ -496,6 +511,33 @@ function sfxDefeat(){ [400,300,200].forEach((f,i)=>beep(f,0.3,'sawtooth',0.1,i*0
 function applySound(){
   document.getElementById('sound-toggle').textContent = profile.soundOn ? '🔊' : '🔇';
 }
+function vibrate(pattern){ try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){} }
+
+/* ---- ambient background loop (kept very quiet, under the SFX) ---- */
+let bgmTimer = null;
+let bgmStep = 0;
+const BGM_SCALES = [
+  [523,587,659,784,880],
+  [493,587,659,740,880],
+  [440,523,587,659,784],
+  [466,554,622,698,830],
+  [523,659,784,880,1046]
+];
+function startBgm(worldIndex){
+  stopBgm();
+  const scale = BGM_SCALES[worldIndex % BGM_SCALES.length];
+  bgmStep = 0;
+  bgmTimer = setInterval(()=>{
+    if(!profile.soundOn || !audioCtx) return;
+    const note = scale[bgmStep % scale.length];
+    beep(note/2, 0.5, 'sine', 0.03);
+    if(bgmStep % 2 === 0) beep(note, 0.35, 'triangle', 0.025, 0.05);
+    bgmStep++;
+  }, 420);
+}
+function stopBgm(){
+  if(bgmTimer){ clearInterval(bgmTimer); bgmTimer = null; }
+}
 
 /* =================== DOM refs =================== */
 const $ = id => document.getElementById(id);
@@ -608,15 +650,16 @@ function startGame(world, diff){
   };
   gameArea.className = 'game-area world-' + world.id.replace('w','');
   gameArea.id = 'game-area';
-  gameArea.querySelectorAll('.word,.particle').forEach(el=>el.remove());
+  gameArea.querySelectorAll('.word,.particle,.score-pop').forEach(el=>el.remove());
   $('toast-container').innerHTML = '';
   mascot.textContent = profile.activeChar;
-  mascot.classList.remove('happy','sad');
+  mascot.classList.remove('happy','sad','mega','charged');
   renderLives(); updateHUD();
   showScreen('screen-game');
   lastTime = null;
   cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(loop);
+  startBgm(WORLDS.indexOf(world));
 }
 
 function pickWord(){
@@ -642,8 +685,9 @@ function renderWordText(w){
   const todo = w.romaji.slice(w.typed.length);
   w.el.querySelector('.romaji').innerHTML = `<span class="done">${done}</span><span class="todo">${todo}</span>`;
 }
-function spawnParticles(x,y,color){
-  for(let i=0;i<14;i++){
+function spawnParticles(x,y,color,count){
+  count = count || 14;
+  for(let i=0;i<count;i++){
     const p = document.createElement('div');
     p.className='particle'; p.style.left=x+'px'; p.style.top=y+'px'; p.style.background=color;
     const angle = Math.random()*Math.PI*2, dist = 30+Math.random()*40;
@@ -653,6 +697,20 @@ function spawnParticles(x,y,color){
     setTimeout(()=>p.remove(), 600);
   }
 }
+function popScoreText(x,y,text,color){
+  const el = document.createElement('div');
+  el.className = 'score-pop';
+  el.textContent = text;
+  el.style.left = x+'px';
+  el.style.top = y+'px';
+  el.style.color = color || 'var(--yellow)';
+  gameArea.appendChild(el);
+  setTimeout(()=>el.remove(), 800);
+}
+function flashScreen(){
+  const fo = $('flash-overlay');
+  fo.classList.remove('flash'); void fo.offsetWidth; fo.classList.add('flash');
+}
 function showToast(text, big){
   const t = document.createElement('div');
   t.className = 'toast'+(big?' big':'');
@@ -660,15 +718,22 @@ function showToast(text, big){
   $('toast-container').appendChild(t);
   setTimeout(()=>t.remove(), 1000);
 }
-function bounceMascot(mood){
-  mascot.classList.remove('happy','sad');
+function bounceMascot(mood, mega){
+  mascot.classList.remove('happy','sad','mega');
   void mascot.offsetWidth;
   mascot.classList.add(mood);
-  setTimeout(()=>mascot.classList.remove(mood), 450);
+  if(mega) mascot.classList.add('mega');
+  setTimeout(()=>mascot.classList.remove(mood,'mega'), mega?600:450);
 }
+function comboTier(combo){ return combo>=30?4:combo>=20?3:combo>=10?2:combo>=5?1:0; }
+const COMBO_TIER_COLORS = ['var(--pink)','var(--mint)','var(--yellow)','#ff9a5a','var(--purple)'];
 function updateHUD(){
   $('score-value').textContent = state.score;
-  $('combo-value').textContent = state.combo;
+  const comboEl = $('combo-value');
+  comboEl.textContent = state.combo;
+  const tier = comboTier(state.combo);
+  comboEl.style.color = COMBO_TIER_COLORS[tier];
+  comboEl.style.textShadow = tier>0 ? `0 0 ${6+tier*4}px ${COMBO_TIER_COLORS[tier]}` : 'none';
   $('progress-label').textContent = `${state.cleared} / ${state.goal} もん`;
   $('progress-fill').style.width = Math.min(100, (state.cleared/state.goal)*100)+'%';
 }
@@ -685,28 +750,41 @@ function renderLives(){
 function completeWord(w){
   const rect = w.el.getBoundingClientRect();
   const areaRect = gameArea.getBoundingClientRect();
-  spawnParticles(rect.left-areaRect.left+rect.width/2, rect.top-areaRect.top+rect.height/2, '#5be7b0');
+  const cx = rect.left-areaRect.left+rect.width/2;
+  const cy = rect.top-areaRect.top+rect.height/2;
   w.el.remove();
   state.words = state.words.filter(x=>x!==w);
   if(state.target===w) state.target=null;
 
   state.combo++;
   state.bestCombo = Math.max(state.bestCombo, state.combo);
+  const tier = comboTier(state.combo);
   const multiplier = 1 + Math.floor(state.combo/5)*0.5;
-  state.score += Math.round((10*w.romaji.length + 30) * multiplier);
+  const gained = Math.round((10*w.romaji.length + 30) * multiplier);
+  state.score += gained;
   state.cleared++;
 
-  bounceMascot('happy');
+  spawnParticles(cx, cy, tier>=2?'#ffd93d':'#5be7b0', 14 + tier*6);
+  popScoreText(cx, cy, '+'+gained, COMBO_TIER_COLORS[tier]);
+  flashScreen();
+
+  const milestone = !!COMBO_CHEERS[state.combo];
+  bounceMascot('happy', milestone);
+  if(state.combo>=10) mascot.classList.add('charged');
   sfxComplete();
   updateHUD();
+  const comboEl = $('combo-value');
+  comboEl.classList.remove('combo-pop'); void comboEl.offsetWidth; comboEl.classList.add('combo-pop');
+  vibrate(milestone ? [20,40,20,40,30] : 12);
 
-  if(COMBO_CHEERS[state.combo]) showToast(COMBO_CHEERS[state.combo], true);
+  if(milestone) showToast(COMBO_CHEERS[state.combo], true);
   else showToast(CHEERS[Math.floor(Math.random()*CHEERS.length)], false);
 
   if(state.cleared % 5 === 0 && state.cleared < state.goal){
     state.fallSpeed += state.cfg.speedStep;
     state.spawnInterval = Math.max(state.cfg.spawnFloor, state.spawnInterval - 0.12);
     banner('ペースアップ！');
+    spawnParticles(gameArea.clientWidth/2, gameArea.clientHeight*0.36, '#ffd93d', 20);
     sfxPace();
   }
 
@@ -729,8 +807,10 @@ function missWord(w){
 
   state.combo = 0;
   state.lives--;
+  mascot.classList.remove('charged');
   bounceMascot('sad');
   sfxMiss();
+  vibrate(25);
   gameArea.classList.remove('shake'); void gameArea.offsetWidth; gameArea.classList.add('shake');
   renderLives(); updateHUD();
 
@@ -790,6 +870,7 @@ function loop(t){
 /* =================== Finish stage / results =================== */
 async function finishStage(result){
   cancelAnimationFrame(rafId);
+  stopBgm();
   gameArea.querySelectorAll('.word').forEach(el=>el.remove());
 
   const stars = result==='clear' ? state.lives : 0;
@@ -1002,7 +1083,8 @@ $('quit-btn').addEventListener('click', ()=>{
   if(!state) return;
   if(!confirm('ゲームを やめて タイトルに もどりますか？')) return;
   cancelAnimationFrame(rafId);
-  gameArea.querySelectorAll('.word,.particle').forEach(el=>el.remove());
+  stopBgm();
+  gameArea.querySelectorAll('.word,.particle,.score-pop').forEach(el=>el.remove());
   state = null;
   showScreen('screen-title');
 });
