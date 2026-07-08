@@ -937,6 +937,7 @@ $('reset-btn').addEventListener('click', async ()=>{
 /* =================== On-screen (tap) keyboard =================== */
 const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 let kbVisible = IS_TOUCH; // auto-show on touch devices, hidden by default on desktop
+let hardwareKeyboardDetected = false;
 
 (function buildOnscreenKeyboard(){
   const rows = ['qwertyuiop','asdfghjkl','zxcvbnm'];
@@ -966,11 +967,13 @@ let kbVisible = IS_TOUCH; // auto-show on touch devices, hidden by default on de
   updateKeyboardVisibility();
 })();
 
-function updateKeyboardVisibility(){
+function updateKeyboardVisibility(auto){
   $('onscreen-kb').classList.toggle('show', kbVisible);
   $('hint-bar').textContent = kbVisible
     ? 'したの キーボードを タップして うとう！（例：ねこ → n → e → k → o）'
-    : 'キーボードで うとう（例：ねこ → n → e → k → o）';
+    : auto
+      ? '外部キーボードを けんしゅつしたよ！（⌨️ボタンで がめんのキーボードも だせるよ）'
+      : 'キーボードで うとう（例：ねこ → n → e → k → o）';
 }
 $('kb-toggle-btn').addEventListener('click', ()=>{
   kbVisible = !kbVisible;
@@ -1014,6 +1017,14 @@ $('sound-toggle').addEventListener('click', async ()=>{
 
 window.addEventListener('keydown', e=>{
   if($('name-input') === document.activeElement) return; // don't hijack typing in nickname field
+  if(!hardwareKeyboardDetected){
+    hardwareKeyboardDetected = true;
+    // A real keydown only comes from a physical/external keyboard - the on-screen
+    // keys fire via touchstart/mousedown, not keydown - so seeing one here means
+    // the player has a keyboard attached and doesn't need the tap keyboard taking
+    // up screen space.
+    if(kbVisible){ kbVisible = false; updateKeyboardVisibility(true); }
+  }
   handleKey(e);
 });
 $('name-input').addEventListener('keydown', e=>{
